@@ -7,6 +7,11 @@
 import numpy as np 
 from matplotlib import pyplot as plt
 
+def str2float(list_str):
+# tranforms a list of string into a list of floats
+    list_float = [float(i) for i in list_str]
+    return list_float
+
 
 def calc_local_hour(yr,month,day,H_UTC,min_UTC, lon):
 # function to calculate the local solar time 
