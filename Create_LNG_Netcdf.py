@@ -102,30 +102,75 @@ def readData(fname, nb_lines=header_lines):
     f.close()
     return data
 
-def read_data_list (infile):
+def read_data_list (path, infile):
     """reads the .dir file containig the file names"""
-    f = open(infile)
-    line = f.read().splitlines()
-    out_list = line[1:]
+    f = open(path + infile)
+    line =  f .read().splitlines()
+    out_list = [ path + '/' + x for x in line[1:] ]
     f.close()
     return out_list
+
+
+from collections import defaultdict
+
+def list_duplicates(seq):
+    """ function to get the duplicates from a list, under the form (key, locs)
+    where key gives the value that is duplicated and locs the (sorted) indices 
+    where the value is found """
+    tally = defaultdict(list)
+    for i,item in enumerate(seq):
+        tally[item].append(i)
+    return ((key,locs) for key,locs in tally.items()
+                            if len(locs)>1)
 
 
 def create_file(outfname, header_all, data_all, nblev, nbprofiles ):
     """function creating the actual NetCDF file and writing the variables"""
 
     dataset = Dataset(outfname, 'w', format='NETCDF4_CLASSIC')
+    nblev = int(nblev)
+    # check for duplicates
+    location = [] 
+    tt = str2float( header_all ['Jour_Julien'] )
+    Long = str2float( header_all ['Long'] )    	
+    Lat  = str2float( header_all ['Long'] )
+    visee = str2float( header_all ['Visee[0:nadi,1:zenith,2:adm]'] )
+    A1064nm   =  str2float( data_all ['1064nm'] )  
+    A532nm    = str2float( data_all ['532nm'] )
+    A355nm    = str2float( data_all ['355nm'] )
+    HSR_355nm = str2float( data_all ['HSR_355nm'] )
 
+    for dup in sorted(list_duplicates(tt)):
+        location.extend(dup[1][1:])
+    for i in location:
+        del(tt[i])
+        del(Long[i])
+        del(Lat[i])
+        del(visee[i])
+	st = int(i*nblev)
+	en = int(st + nblev)
+        del(A1064nm[st:en])
+	del(A532nm[st:en])
+        del(A355nm[st:en])
+        del(HSR_355nm[st:en])
+
+    if len(tt) != int(nbprofiles):
+        print('number of profiles : '+ str(nbprofiles) + ' Number of unique time steps : ' + str(len(tt)) )
+        warn( str(int(nbprofiles) - len(tt)) +  ' duplicates have been removed from the time serie')
+    
+    # file Dimensions  
+    nbprofiles =  len (tt)
     altitude = dataset.createDimension('altitude', nblev)
-    lat      = dataset.createDimension('lat', nbprofiles)
-    lon      = dataset.createDimension('lon', nbprofiles)
     time     = dataset.createDimension('time', nbprofiles)
 
+    # Note that here lat and lon are not proper coordinates as 
+    # each lat-lon point is fully determined by the time coordinate    
+
     times      = dataset.createVariable('time', np.float64, ('time',))
-    # double check that float 32 is enough
-    altitudes   = dataset.createVariable('altitude', np.float32, ('altitude',))
-    latitudes  = dataset.createVariable('latitude', np.float32, ('lat',))
-    longitudes = dataset.createVariable('longitude', np.float32, ('lon',))
+    altitudes  = dataset.createVariable('altitude', np.float32, ('altitude',))
+    
+    latitudes  = dataset.createVariable('latitude', np.float32, ('time',))
+    longitudes = dataset.createVariable('longitude', np.float32, ('time',))
 
     # global attributes
     dataset.description   = 'Backscatter measurements from the airbone Lidar LNG2 during the 2017 AEROCLO-sA campaign'
@@ -145,42 +190,46 @@ def create_file(outfname, header_all, data_all, nblev, nbprofiles ):
     times.units = 'days since 2016-12-31 00:00:00'  # this is the day of year
     times.calendar = 'gregorian'
     times.standard_name = 'time'
-    #
+    # other variables from the header could be created in the file here, if needed
     vtype = dataset.createVariable('obs_type_flag', np.int32, ('time',))
     vtype.long_name = 'Observation type flag (0: Nadir, 1: zenith, 2: admin)'
-    vtype [:]      = str2float( header_all ['Visee[0:nadi,1:zenith,2:adm]'] )
 
     # Create the actual 4-d variable
-    ABC_HRS = dataset.createVariable('ABC_HRS_355nm', np.float32,
-    ('time','altitude','lat','lon'), fill_value =  -9999.999)
+    ABC_HRS  = dataset.createVariable('ABC_HRS_355nm', np.float32,
+    ('time','altitude'), fill_value =  -9999.999)
     ABC_HRS.long_name = 'High Spectral Resolution attenuated backscatter coefficient at 355 nm'
     ABC_HRS.units     = '???'
 
     ABC_355nm = dataset.createVariable('ABC_355nm', np.float32,
-    ('time','altitude','lat','lon'), fill_value =  -9999.999)
+    ('time','altitude'), fill_value =  -9999.999)
     ABC_355nm.long_name = 'Attenuated backscatter coefficient at 355 nm'
     ABC_355nm.units     = '???'
 
     ABC_532nm = dataset.createVariable('ABC_532nm', np.float32,
-    ('time','altitude','lat','lon'), fill_value =  -9999.999)
+    ('time','altitude'), fill_value =  -9999.999)
     ABC_532nm.long_name = 'Attenuated backscatter coefficient at 532 nm'
     ABC_532nm.units     = '???'
 
     ABC_1064nm = dataset.createVariable('ABC_1064nm', np.float32,
-    ('time','altitude','lat','lon'), fill_value =  -9999.999)
+    ('time','altitude'), fill_value =  -9999.999)
     ABC_1064nm.long_name = 'Attenuated backscatter coefficient at 1064 nm'
     ABC_1064nm.units     = '???'
 
     # write the data ; here this could be a loop aver multiple files
+    
     altitudes [:]  = str2float( data_all['altitude'] )
-    times [:]      = str2float( header_all ['Jour_Julien'] )
-    longitudes [:] = str2float( header_all ['Long'] )
-    latitudes [:]  = str2float( header_all ['Lat'] )
 
-    ABC_1064nm [:] = str2float( data_all ['1064nm'] )
-    ABC_532nm  [:] = str2float( data_all ['532nm'] )
-    ABC_355nm  [:] = str2float( data_all ['355nm'] )
-    ABC_HRS    [:] = str2float( data_all ['HSR_355nm'] )
+    times [:] = tt 
+
+    longitudes [:]  = Long  # str2float( header_all ['Long'] )
+    latitudes  [:]  = Lat   # str2float( header_all ['Lat'] )
+
+    vtype [:]      = visee  # str2float( header_all ['Visee[0:nadi,1:zenith,2:adm]'] )
+
+    ABC_1064nm [:] = A1064nm  #str2float( data_all ['1064nm'] )
+    ABC_532nm  [:] = A532nm   # str2float( data_all ['532nm'] )
+    ABC_355nm  [:] = A355nm   #str2float( data_all ['355nm'] )
+    ABC_HRS    [:] = HSR_355nm # str2float( data_all ['HSR_355nm'] )
 
     # create file
     dataset.close()
@@ -195,8 +244,8 @@ for volnb in flight_number_range:
     fnames = []
     for d in dir_list:
         # read filenamelist
-        names = read_data_list(path_in + d + '/liste.dir')
-        fnames +=  names # list of all the fullpath of one flight
+        names = read_data_list( d, 'liste.dir')
+        fnames += names  # list of all the fullpath of one flight
 
     i = 0
 # reade all files for the flight volnb
@@ -205,17 +254,18 @@ for volnb in flight_number_range:
             data_all = readData(fname=name)
             name_alt = name
             altitude_list = data_all['altitude']
-            header_all = readHeader(fname=name)
-            flight_date = header_all['DATE'].replace(" ", "")
-            nlev = header_all['Nombre_lignes_mesures'][0]
-            if int(nlev) != expected_nblev :
+            
+            header_all  = readHeader(fname=name)
+            flight_date = header_all['DATE'][0].replace(" ", "")
+            nlev        = header_all['Nombre_lignes_mesures'][0]
+            if int(nlev) != int(expected_nblev) :
                 warn( 'The number of vertical levels in the file' + name +
                                   ' (' + nlev + ') is different from expected (' + str(expected_nblev) + ')' )
             i = 1
         else:
             data = readData(fname=name)
             header = readHeader(fname=name)
-            if int(header['Nombre_lignes_mesures'][0]) != nlev:  # all the files must have the same number of vertical levels
+            if int(header['Nombre_lignes_mesures'][0]) != int(nlev):  # all the files must have the same number of vertical levels
                 raise ValueError( 'The number of vertical levels in the file' + name +
                                   ' (' + header['Nombre_lignes_mesures'][0] +
                                     ') is different from the one in tyhe first file read  '
@@ -232,6 +282,12 @@ for volnb in flight_number_range:
                 header_all[col].extend(header[col])  # only one line per header
 
     outname = outpath + '/LNG2_ABC_' + flight_date + '_Vol' + str(volnb)  + '.nc'
+    
+    # check if time variable has duplicates
+    if len(header_all['Jour_Julien']) != len(set(header_all['Jour_Julien'])) : 
+        print( len(header_all['Jour_Julien']) )
+        print( len(set(header_all['Jour_Julien'])))
+	warn('duplicate time value in ' + flight_date + ' Vol' + str(volnb) ) 
     # create netcdf file with Time, lat, lon and height as coordinates - on file per flight
     create_file(outfname = outname, header_all=header_all, data_all=data_all, nblev=nlev, nbprofiles=len(header_all['Long']) )
 
