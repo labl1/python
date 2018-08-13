@@ -16,7 +16,7 @@ import glob as glob
 outpath        = '/mesonh/labl/LNG2/'                            # the output files will be written here
 path_in_all    = '/mesonh/chajp/WALVI/LIDAR/Aeroclo-sA_LNGdata/' # directory containing all the LNG ASCII 
 in_fnames_type = '*.?' # individual ASCII file names are of this form 
-
+datalev        = 'level0'  # level 0 data
 expected_nblev= 2333 # number of vertical levels expected in the ASCII files (not needed but will print warning if different)
                      # but nlev must be constant within one flight 
 header_lines  = 43   # default number of header lines (not needed but will print warning if different)
@@ -169,15 +169,18 @@ def create_file(outfname, header_all, data_all, nblev, nbprofiles ):
     # each lat-lon point is fully determined by the time coordinate    
 
     times      = dataset.createVariable('time', np.float64, ('time',))
+
     altitudes  = dataset.createVariable('altitude', np.float32, ('altitude',))
-    
+    altitudes [0:]  = str2float( data_all['altitude'] )
+
     latitudes  = dataset.createVariable('latitude', np.float32, ('time',))
     longitudes = dataset.createVariable('longitude', np.float32, ('time',))
 
     # global attributes
-    dataset.description   = 'Backscatter measurements from the airbone Lidar LNG2 during the 2017 AEROCLO-sA campaign'
+    dataset.description   = 'Backscatter measurements from the airbone Lidar LNG2 during the 2017 AEROCLO-sA campaign. This is level 0 data (apparent signal, in arbitrary units)'
     dataset.instrument_PI = 'Cyrille Flamant, LATMOS, Paris, France'
-    dataset.history       = 'NetCDF file created ' + ttime.ctime(ttime.time()) +  ' from original ASCII files'
+    dataset.history       = 'NetCDF file created ' + ttime.ctime(ttime.time()) +
+    ' from original ASCII files. The python scripts used can be obtained from Laurent Labbouz github repository: https://github.com/labl1/python'
 
     latitudes.units  = 'degree_north'
     latitudes.long_name = 'Latitude'
@@ -199,34 +202,32 @@ def create_file(outfname, header_all, data_all, nblev, nbprofiles ):
     # Create the actual 4-d variable
     ABC_HRS  = dataset.createVariable('ABC_HRS_355nm', np.float32,
     ('time','altitude'), fill_value =  -9999.999)
-    ABC_HRS.long_name = 'High Spectral Resolution attenuated backscatter coefficient at 355 nm'
-    ABC_HRS.units     = 'km-1 sr-1'
+    ABC_HRS.long_name = 'Apparent backscattered signal at 355nm - HSR' #'High Spectral Resolution attenuated backscatter coefficient at 355 nm'
+    ABC_HRS.units     = 'arbitrary units' # 'km-1 sr-1'
     ABC_HRS.valid_min = 0.
 
     ABC_355nm = dataset.createVariable('ABC_355nm', np.float32,
     ('time','altitude'), fill_value =  -9999.999)
-    ABC_355nm.long_name = 'Attenuated backscatter coefficient at 355 nm'
-    ABC_355nm.units     = 'km-1 sr-1'
+    ABC_355nm.long_name = 'Apparent backscattered signal at 355nm' #'Attenuated backscatter coefficient at 355 nm'
+    ABC_355nm.units     = 'arbitrary units' #'km-1 sr-1'
     ABC_355nm.valid_min = 0.
     
 
     ABC_532nm = dataset.createVariable('ABC_532nm', np.float32,
     ('time','altitude'), fill_value =  -9999.999)
-    ABC_532nm.long_name = 'Attenuated backscatter coefficient at 532 nm'
-    ABC_532nm.units     = 'km-1 sr-1'
+    ABC_532nm.long_name = 'Apparent backscattered signal at 532nm' #'Attenuated backscatter coefficient at 532 nm'
+    ABC_532nm.units     = 'arbitrary units' #'km-1 sr-1'
     ABC_532nm.valid_min = 0.
 
 
     ABC_1064nm = dataset.createVariable('ABC_1064nm', np.float32,
     ('time','altitude'), fill_value =  -9999.999)
-    ABC_1064nm.long_name = 'Attenuated backscatter coefficient at 1064 nm'
-    ABC_1064nm.units     = 'km-1 sr-1'
+    ABC_1064nm.long_name = 'Apparent backscattered signal at 1064nm' #'Attenuated backscatter coefficient at 1064 nm'
+    ABC_1064nm.units     = 'arbitrary units' #'km-1 sr-1'
     ABC_1064nm.valid_min = 0.
 
 
     # write the data ; here this could be a loop aver multiple files
-    
-    altitudes [0:]  = str2float( data_all['altitude'] )
 
     times [:] = tt 
 
@@ -290,7 +291,7 @@ for volnb in flight_number_range:
             for col in header_all.keys():
                 header_all[col].extend(header[col])  # only one line per header
 
-    outname = outpath + '/LNG2_ABC_' + flight_date + '_Vol' + str(volnb)  + '.nc'
+    outname = outpath + '/LNG2_ABC_' + datalev+'_' + flight_date + '_Vol' + str(volnb) +'.nc'
     
     # check if time variable has duplicates
     if len(header_all['Jour_Julien']) != len(set(header_all['Jour_Julien'])) : 
