@@ -292,7 +292,7 @@ for volnb in flight_number_range:
                 # print(col)
                 # altitude is a coordinate, and always the same so there is actually no need to read it over and over againb
                 if col != 'altitude':
-                    if int(header['Visee[0:nadi,1:zenith,2:adm]']) == int(1):
+                    if int(header['Visee[0:nadi,1:zenith,2:adm]'][0]) == int(1):
                         data[col]=[ij for ij in reversed(data[col])]
 
                     data_all[col].extend(data[col])
