@@ -1,6 +1,7 @@
-#!/usr/bin/python3
+#!/usr/bin/python
 # to create LNG NetCDF files based on the original ASCII *.n.* or *.z.* files
 # (type Vol12/000529.n/LNG2_20170908.000.n.001054)
+# should work with botjh python 2.7 and python 3 as long as netCDF4 is installed
 # L. Labbouz, Aug 2018
 
 from warnings import warn
@@ -10,21 +11,20 @@ import numpy as np
 import time as ttime
 import glob as glob
 
-# TODO ask Cyrille about:
-# valid range ? negative altitude ? Altitude AMSL??
-# negative backscatter values ? units ?
-# other parameters needed
+# ***************** Parameters to edit ************************************ #
 
-# ***************** Parameters that may have to be edited ******************* #
+outpath        = '/mesonh/labl/LNG2/'                            # the output files will be written here
+path_in_all    = '/mesonh/chajp/WALVI/LIDAR/Aeroclo-sA_LNGdata/' # directory containing all the LNG ASCII 
+in_fnames_type = '*.?' # individual ASCII file names are of this form 
 
-outpath     = '/mesonh/labl/LNG2/'                            # the output files will be written here
-path_in_all = '/mesonh/chajp/WALVI/LIDAR/Aeroclo-sA_LNGdata/' # directory containing all the data :
-
-expected_nblev= 2333 # number of vertical levels expected in the ASCII files (warning if different)
-header_lines  = 43   # default number of header lines
-non_rd_hlines = 5    # number of lines at the end of tyhe Header that are not readable / not usefull to read
+expected_nblev= 2333 # number of vertical levels expected in the ASCII files (not needed but will print warning if different)
+                     # but nlev must be constant within one flight 
+header_lines  = 43   # default number of header lines (not needed but will print warning if different)
+non_rd_hlines = 5    # number of lines at the end of tyhe Header that are not readable / not usefull to read (mandatory)
 
 flight_number_range = range(6,15+1) # for processing flights number 6 to 15
+
+
 
 # ************************** Function definitions ******************************* #
 
@@ -75,7 +75,7 @@ def readData(fname, nb_lines=header_lines):
     if key == 'Nombre_lignes_en_tete':
         nb_lines = int(value)
     else:
-        warn("number of lines in header not found - assume 43")
+        warn("number of lines in header not found - assume "+str(header_lines))
 
     # Ignore the header
     for i in range(nb_lines - 1):  # -1 as first line already read
@@ -198,22 +198,29 @@ def create_file(outfname, header_all, data_all, nblev, nbprofiles ):
     ABC_HRS  = dataset.createVariable('ABC_HRS_355nm', np.float32,
     ('time','altitude'), fill_value =  -9999.999)
     ABC_HRS.long_name = 'High Spectral Resolution attenuated backscatter coefficient at 355 nm'
-    ABC_HRS.units     = '???'
+    ABC_HRS.units     = 'km-1 sr-1'
+    ABC_HRS.valid_min = 0.
 
     ABC_355nm = dataset.createVariable('ABC_355nm', np.float32,
     ('time','altitude'), fill_value =  -9999.999)
     ABC_355nm.long_name = 'Attenuated backscatter coefficient at 355 nm'
-    ABC_355nm.units     = '???'
+    ABC_355nm.units     = 'km-1 sr-1'
+    ABC_355nm.valid_min = 0.
+    
 
     ABC_532nm = dataset.createVariable('ABC_532nm', np.float32,
     ('time','altitude'), fill_value =  -9999.999)
     ABC_532nm.long_name = 'Attenuated backscatter coefficient at 532 nm'
-    ABC_532nm.units     = '???'
+    ABC_532nm.units     = 'km-1 sr-1'
+    ABC_532nm.valid_min = 0.
+
 
     ABC_1064nm = dataset.createVariable('ABC_1064nm', np.float32,
     ('time','altitude'), fill_value =  -9999.999)
     ABC_1064nm.long_name = 'Attenuated backscatter coefficient at 1064 nm'
-    ABC_1064nm.units     = '???'
+    ABC_1064nm.units     = 'km-1 sr-1'
+    ABC_1064nm.valid_min = 0.
+
 
     # write the data ; here this could be a loop aver multiple files
     
@@ -240,7 +247,7 @@ def create_file(outfname, header_all, data_all, nblev, nbprofiles ):
 for volnb in flight_number_range:
     path_in = path_in_all + 'Vol' + str(volnb)
     # should be only one dir file
-    dir_list = glob.glob( path_in + '/*.?/' )
+    dir_list = glob.glob( path_in + '/'+in_fnames_type+'/' )
     fnames = []
     for d in dir_list:
         # read filenamelist
