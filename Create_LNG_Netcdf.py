@@ -266,14 +266,14 @@ for volnb in flight_number_range:
             header_all  = readHeader(fname=name)
 
             # write the data in reverse order if in zenith mode - we use the nadir mode direction as default
-            if int(header_all['Visee[0:nadi,1:zenith,2:adm]']) == int(1):
+            if int(header_all['Visee[0:nadi,1:zenith,2:adm]'][0]) == int(1):
                 for key in data_all.keys():
                     data_all[key]=[ij for ij in reversed(data_all[key])]
 
             flight_date = header_all['DATE'][0].replace(" ", "")
             nlev        = header_all['Nombre_lignes_mesures'][0]
 
-            if int(header_all['Visee[0:nadi,1:zenith,2:adm]']) != int(2): # 2 is for admin => skip them and redo this step
+            if int(header_all['Visee[0:nadi,1:zenith,2:adm]'][0]) != int(2): # 2 is for admin => skip them and redo this step
                 if int(nlev) != int(expected_nblev):
                     warn('The number of vertical levels in the file' + name +
                          ' (' + nlev + ') is different from expected (' + str(expected_nblev) + ')')
