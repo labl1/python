@@ -140,17 +140,19 @@ def create_file(outfname, header_all, data_all, nblev, nbprofiles ):
     A355nm    = str2float( data_all ['355nm'] )
     HSR_355nm = str2float( data_all ['HSR_355nm'] )
 
+    # if there are duplicates select keep only the first value
     for dup in sorted(list_duplicates(tt)):
         location.extend(dup[1][1:])
-    for i in location:
+    # delete elements in the reverse order to avoid having indices changing (here only one duplicate but essential if there are more of them)
+    for i in sorted(location, reverse=True):
         del(tt[i])
         del(Long[i])
         del(Lat[i])
         del(visee[i])
-	st = int(i*nblev)
-	en = int(st + nblev)
+        st = int(i*nblev)
+        en = int(st + nblev)
         del(A1064nm[st:en])
-	del(A532nm[st:en])
+        del(A532nm[st:en])
         del(A355nm[st:en])
         del(HSR_355nm[st:en])
 
@@ -224,7 +226,7 @@ def create_file(outfname, header_all, data_all, nblev, nbprofiles ):
 
     # write the data ; here this could be a loop aver multiple files
     
-    altitudes [:]  = str2float( data_all['altitude'] )
+    altitudes [0:]  = str2float( data_all['altitude'] )
 
     times [:] = tt 
 
@@ -294,7 +296,7 @@ for volnb in flight_number_range:
     if len(header_all['Jour_Julien']) != len(set(header_all['Jour_Julien'])) : 
         print( len(header_all['Jour_Julien']) )
         print( len(set(header_all['Jour_Julien'])))
-	warn('duplicate time value in ' + flight_date + ' Vol' + str(volnb) ) 
+        warn('duplicate time value in ' + flight_date + ' Vol' + str(volnb) )
     # create netcdf file with Time, lat, lon and height as coordinates - on file per flight
     create_file(outfname = outname, header_all=header_all, data_all=data_all, nblev=nlev, nbprofiles=len(header_all['Long']) )
 
