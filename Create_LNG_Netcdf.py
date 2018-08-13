@@ -1,7 +1,7 @@
 #!/usr/bin/python
 # to create LNG NetCDF files based on the original ASCII *.n.* or *.z.* files
 # (type Vol12/000529.n/LNG2_20170908.000.n.001054)
-# should work with botjh python 2.7 and python 3 as long as netCDF4 is installed
+# should work with both python 2.7 and python 3 as long as netCDF4 is installed
 # L. Labbouz, Aug 2018
 
 from warnings import warn
@@ -14,7 +14,7 @@ import glob as glob
 # ***************** Parameters to edit ************************************ #
 
 outpath        = '/mesonh/labl/LNG2/'                            # the output files will be written here
-path_in_all    = '/mesonh/chajp/WALVI/LIDAR/Aeroclo-sA_LNGdata/' # directory containing all the LNG ASCII 
+path_in_all    = '/mesonh/chajp/WALVI/LIDAR/Aeroclo-sA_LNGdata/' # directory containing all the LNG ASCII
 in_fnames_type = '*.?' # individual ASCII file names are of this form 
 datalev        = 'level0'  # level 0 data
 expected_nblev= 2333 # number of vertical levels expected in the ASCII files (not needed but will print warning if different)
@@ -104,6 +104,7 @@ def readData(fname, nb_lines=header_lines):
 
 def read_data_list (path, infile):
     """reads the .dir file containig the file names"""
+    """reads the .dir file containig the file names"""
     f = open(path + infile)
     line =  f .read().splitlines()
     out_list = [ path + '/' + x for x in line[1:] ]
@@ -133,7 +134,7 @@ def create_file(outfname, header_all, data_all, nblev, nbprofiles ):
     location = [] 
     tt = str2float( header_all ['Jour_Julien'] )
     Long = str2float( header_all ['Long'] )    	
-    Lat  = str2float( header_all ['Long'] )
+    Lat  = str2float( header_all ['Lat'] )
     visee = str2float( header_all ['Visee[0:nadi,1:zenith,2:adm]'] )
     A1064nm   =  str2float( data_all ['1064nm'] )  
     A532nm    = str2float( data_all ['532nm'] )
@@ -179,8 +180,7 @@ def create_file(outfname, header_all, data_all, nblev, nbprofiles ):
     # global attributes
     dataset.description   = 'Backscatter measurements from the airbone Lidar LNG2 during the 2017 AEROCLO-sA campaign. This is level 0 data (apparent signal, in arbitrary units)'
     dataset.instrument_PI = 'Cyrille Flamant, LATMOS, Paris, France'
-    dataset.history       = 'NetCDF file created ' + ttime.ctime(ttime.time()) +
-    ' from original ASCII files. The python scripts used can be obtained from Laurent Labbouz github repository: https://github.com/labl1/python'
+    dataset.history       = 'NetCDF file created ' + ttime.ctime(ttime.time()) +' from original ASCII files. The python scripts used can be obtained from Laurent Labbouz github repository: https://github.com/labl1/python'
 
     latitudes.units  = 'degree_north'
     latitudes.long_name = 'Latitude'
@@ -261,17 +261,23 @@ for volnb in flight_number_range:
 # reade all files for the flight volnb
     for name in fnames:
         if i == 0:
-            data_all = readData(fname=name)
             name_alt = name
-            altitude_list = data_all['altitude']
-            
+            data_all = readData(fname=name)
             header_all  = readHeader(fname=name)
+
+            # write the data in reverse order if in zenith mode - we use the nadir mode direction as default
+            if int(header_all['Visee[0:nadi,1:zenith,2:adm]']) == int(1):
+                for key in data_all.keys():
+                    data_all[key]=[ij for ij in reversed(data_all[key])]
+
             flight_date = header_all['DATE'][0].replace(" ", "")
             nlev        = header_all['Nombre_lignes_mesures'][0]
-            if int(nlev) != int(expected_nblev) :
-                warn( 'The number of vertical levels in the file' + name +
-                                  ' (' + nlev + ') is different from expected (' + str(expected_nblev) + ')' )
-            i = 1
+
+            if int(header_all['Visee[0:nadi,1:zenith,2:adm]']) != int(2): # 2 is for admin => skip them and redo this step
+                if int(nlev) != int(expected_nblev):
+                    warn('The number of vertical levels in the file' + name +
+                         ' (' + nlev + ') is different from expected (' + str(expected_nblev) + ')')
+                i = 1
         else:
             data = readData(fname=name)
             header = readHeader(fname=name)
@@ -286,7 +292,11 @@ for volnb in flight_number_range:
                 # print(col)
                 # altitude is a coordinate, and always the same so there is actually no need to read it over and over againb
                 if col != 'altitude':
+                    if int(header['Visee[0:nadi,1:zenith,2:adm]']) == int(1):
+                        data[col]=[ij for ij in reversed(data[col])]
+
                     data_all[col].extend(data[col])
+
                     # ou equivalent data_all[col] += data[col]
             for col in header_all.keys():
                 header_all[col].extend(header[col])  # only one line per header
