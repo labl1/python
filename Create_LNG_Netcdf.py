@@ -1,6 +1,6 @@
 #!/usr/bin/python
-# to create LNG NetCDF files based on the original ASCII *.n.* or *.z.* files
-# (type Vol12/000529.n/LNG2_20170908.000.n.001054)
+# to create LNG NetCDF files based on the original (level 0) ASCII files of type LNG2*.n.* or LNG2*.z.*
+# (e.g. Vol12/000529.n/LNG2_20170908.000.n.001054)
 # should work with both python 2.7 and python 3 as long as netCDF4 is installed
 # L. Labbouz, Aug 2018
 
@@ -15,7 +15,7 @@ import glob as glob
 
 outpath        = '/mesonh/labl/LNG2/'                            # the output files will be written here
 path_in_all    = '/mesonh/chajp/WALVI/LIDAR/Aeroclo-sA_LNGdata/' # directory containing all the LNG ASCII
-in_fnames_type = '*.?' # individual ASCII file names are of this form 
+in_dnames_type = '*.?' # individual input directories are named following this form
 datalev        = 'level0'  # level 0 data
 expected_nblev= 2333 # number of vertical levels expected in the ASCII files (not needed but will print warning if different)
                      # but nlev must be constant within one flight 
@@ -250,7 +250,7 @@ def create_file(outfname, header_all, data_all, nblev, nbprofiles ):
 for volnb in flight_number_range:
     path_in = path_in_all + 'Vol' + str(volnb)
     # should be only one dir file
-    dir_list = glob.glob( path_in + '/'+in_fnames_type+'/' )
+    dir_list = glob.glob( path_in + '/'+in_dnames_type+'/' )
     fnames = []
     for d in dir_list:
         # read filenamelist
