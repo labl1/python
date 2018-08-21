@@ -5,6 +5,11 @@
 # should work with both python 2.7 and python 3 as long as netCDF4 is installed
 # L. Labbouz, Aug 2018
 
+# TODO process eroneous times (check for instance Vol 7 as it's one of them having data at 00 UTC)
+# TODO add mention of this treatment if the final Netcdf file
+
+# TODO: it looks like there is an issue with some data not being written when the time is before the last one
+
 import numpy as np
 from warnings import warn
 from various_utils import str2float
@@ -14,8 +19,8 @@ import glob as glob
 
 # ***************** Parameters to edit ************************************ #
 
-outpath        = '/Users/labbouz/Desktop/RESEARCH/AEROCLO/ABC2_netcdf/'  # the output files will be written here
-path_in_all    = '/Users/labbouz/Desktop/Aeroclo-sA_LNGdata/'            # directory containing all the LNG ASCII
+outpath        = '/home/labl/Bureau/ABC2_files/netcdf' #'/Users/labbouz/Desktop/RESEARCH/AEROCLO/ABC2_netcdf/'  # the output files will be written here
+path_in_all    = '/home/labl/Bureau/ABC2_files/originel_ASCII' #'/Users/labbouz/Desktop/Aeroclo-sA_LNGdata/'            # directory containing all the LNG ASCII
 name_in_type   = 'ArchiveAeroclo-sA_LNG_ABC_'                    # name of the per flight directories before "Vol + number"
 in_fnames_type = 'ABC2*'   # individual input ASCII file names are of this form
 datalev        = 'level1'  # level 1 data
@@ -82,7 +87,7 @@ def readData(fname, nb_lines=header_lines):
     # Ignore the header
     for i in range(nb_lines - 1):  # -1 as first line already read
         f.readline()
-    # Read in variable names (Attenuated_Backscatter_Coefficient)
+    # name the columns of data (for referencing in the dictionary)
     col_names = ['altitude',
                  'HSR_355nm',
                  '355nm',
@@ -96,7 +101,7 @@ def readData(fname, nb_lines=header_lines):
         # Strip any white space from line
         line = line.strip()
         values = line.split()
-
+        # for each column i, corresponding value is written in the dict data (data are written one by one here)
         for (i, value) in enumerate(values):
             col_name = col_names[i]
             data[col_name].append(value)
@@ -105,7 +110,6 @@ def readData(fname, nb_lines=header_lines):
     return data
 
 def read_data_list (path, infile):
-    """reads the .dir file containig the file names"""
     """reads the .dir file containig the file names"""
     f = open(path + infile)
     line =  f .read().splitlines()
@@ -180,9 +184,12 @@ def create_file(outfname, header_all, data_all, nblev, nbprofiles ):
     longitudes = dataset.createVariable('longitude', np.float32, ('time',))
 
     # global attributes
-    dataset.description   = 'Backscatter measurements from the airbone Lidar LNG2 during the 2017 AEROCLO-sA campaign. This is level 1 data (Attenuated backscatter)'
+    dataset.description   = 'Backscatter measurements from the airbone Lidar LNG2 during the 2017 AEROCLO-sA campaign. ' \
+                            'This is level 1 data (Attenuated backscatter)'
     dataset.instrument_PI = 'Cyrille Flamant, LATMOS, Paris, France'
-    dataset.history       = 'NetCDF file created ' + ttime.ctime(ttime.time()) +' by L. Labbouz from original ASCII files (ABC2* files). The python scripts used can be obtained from Laurent Labbouz github repository: https://github.com/labl1/python'
+    dataset.history       = 'NetCDF file created ' + ttime.ctime(ttime.time()) + ' by ' \
+                            'L. Labbouz from original ASCII files (ABC2* files). The python ' \
+                            'scripts used can be obtained from Laurent Labbouz github repository: https://github.com/labl1/python'
 
     latitudes.units  = 'degree_north'
     latitudes.long_name = 'Latitude'
@@ -229,19 +236,18 @@ def create_file(outfname, header_all, data_all, nblev, nbprofiles ):
     ABC_1064nm.valid_min = 0.
 
 
-    # write the data ; here this could be a loop aver multiple files
-
+    # write the data
     times [:] = tt 
 
-    longitudes [:]  = Long  # str2float( header_all ['Long'] )
-    latitudes  [:]  = Lat   # str2float( header_all ['Lat'] )
+    longitudes [:]  = Long
+    latitudes  [:]  = Lat
 
-    vtype [:]      = visee  # str2float( header_all ['Visee[0:nadi,1:zenith,2:adm]'] )
+    vtype [:]      = visee
 
-    ABC_1064nm [:] = A1064nm  #str2float( data_all ['1064nm'] )
-    ABC_532nm  [:] = A532nm   # str2float( data_all ['532nm'] )
-    ABC_355nm  [:] = A355nm   #str2float( data_all ['355nm'] )
-    ABC_HRS    [:] = HSR_355nm # str2float( data_all ['HSR_355nm'] )
+    ABC_1064nm [:] = A1064nm
+    ABC_532nm  [:] = A532nm
+    ABC_355nm  [:] = A355nm
+    ABC_HRS    [:] = HSR_355nm
 
     # create file
     dataset.close()
@@ -253,6 +259,9 @@ for volnb in flight_number_range:
     path_in = path_in_all + name_in_type + 'Vol' + str(volnb)
     # only one directory per flight for level 1 data (so it's simpler here than for level 0)
     fnames = glob.glob(path_in + '/'+in_fnames_type)
+
+    if len(fnames) == 0:
+        raise ValueError(' the path for input file ' + path_in  + ' is empty of there is not file of type ' + in_fnames_type +'( Vol' + str(volnb) +' )')
 
     i = 0
 # reade all files for the flight volnb
