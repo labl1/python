@@ -62,7 +62,7 @@ def readHeader(fname, nb_lines_default=header_lines):
     return header
 
 def readData(fname, nb_lines=header_lines):
-    """Reads a data file `fname` and populates dictionary: self.data."""
+    """Reads a data file `fname` and populates dictionary: data """
     #adapted from http://www.ceda.ac.uk/static/media/uploads/ncas-reading-2015/python_read_data_exercises_solutions.pdf
     f = open(fname)
     data = {}
@@ -80,7 +80,7 @@ def readData(fname, nb_lines=header_lines):
     # Ignore the header
     for i in range(nb_lines - 1):  # -1 as first line already read
         f.readline()
-    # Read in variable names (Attenuated_Backscatter_Coefficient)
+    # name the columns of data (for referencing in the dictionary)
     col_names = ['altitude',
                  'HSR_355nm',
                  '355nm',
@@ -89,12 +89,12 @@ def readData(fname, nb_lines=header_lines):
     for col_name in col_names:
         data[col_name] = []
         i = 0
-
+#
     for line in f.readlines():
         # Strip any white space from line
         line = line.strip()
         values = line.split()
-
+        # for each column i, corresponding value is written in the dict data (data are written one by one here)
         for (i, value) in enumerate(values):
             col_name = col_names[i]
             data[col_name].append(value)
@@ -103,8 +103,7 @@ def readData(fname, nb_lines=header_lines):
     return data
 
 def read_data_list (path, infile):
-    """reads the .dir file containig the file names"""
-    """reads the .dir file containig the file names"""
+    """reads the .dir file containing the file names"""
     f = open(path + infile)
     line =  f .read().splitlines()
     out_list = [ path + '/' + x for x in line[1:] ]
@@ -227,19 +226,18 @@ def create_file(outfname, header_all, data_all, nblev, nbprofiles ):
     ABC_1064nm.valid_min = 0.
 
 
-    # write the data ; here this could be a loop aver multiple files
-
+    # write the data
     times [:] = tt 
 
-    longitudes [:]  = Long  # str2float( header_all ['Long'] )
-    latitudes  [:]  = Lat   # str2float( header_all ['Lat'] )
+    longitudes [:]  = Long
+    latitudes  [:]  = Lat
 
-    vtype [:]      = visee  # str2float( header_all ['Visee[0:nadi,1:zenith,2:adm]'] )
+    vtype [:]      = visee
 
-    ABC_1064nm [:] = A1064nm  #str2float( data_all ['1064nm'] )
-    ABC_532nm  [:] = A532nm   # str2float( data_all ['532nm'] )
-    ABC_355nm  [:] = A355nm   #str2float( data_all ['355nm'] )
-    ABC_HRS    [:] = HSR_355nm # str2float( data_all ['HSR_355nm'] )
+    ABC_1064nm [:] = A1064nm
+    ABC_532nm  [:] = A532nm
+    ABC_355nm  [:] = A355nm
+    ABC_HRS    [:] = HSR_355nm
 
     # create file
     dataset.close()
@@ -257,6 +255,8 @@ for volnb in flight_number_range:
         names = read_data_list( d, 'liste.dir')
         fnames += names  # list of all the fullpath of one flight
 
+    if len(fnames) == 0:
+        raise ValueError(' the path for input file ' + path_in  + ' is empty of there is not file of type ' + in_fnames_type + '(Vol' + str(volnb) +')')
     i = 0
 # reade all files for the flight volnb
     for name in fnames:
