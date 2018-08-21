@@ -2,26 +2,24 @@
 # based on Create_LNG_Netcdf.py this script is to process level 1 data (attenuated backscatter)
 # to create LNG NetCDF files based on the original ASCII ABC2*.n.* or ABC2*.z.* files
 # (files like ABC2_20170905.000.n.001059 )
+# NB the sorting function uses the filename (with the last 6 characters being HHmmss) if a flight spans over 2 days this should be changed
 # should work with both python 2.7 and python 3 as long as netCDF4 is installed
 # L. Labbouz, Aug 2018
 
-# TODO process eroneous times (check for instance Vol 7 as it's one of them having data at 00 UTC)
-# TODO add mention of this treatment if the final Netcdf file
-
-# TODO: it looks like there is an issue with some data not being written when the time is before the last one
+# TODO eroneous times in the data -> to be fixed
 
 import numpy as np
 from warnings import warn
 from various_utils import str2float
+from collections import defaultdict
 from netCDF4 import Dataset
 import time as ttime
 import glob as glob
 
 # ***************** Parameters to edit ************************************ #
+outpath        = '/home/labl/Bureau/ABC2_files/netcdf/'        # the output files will be written here
+path_in_all    = '/home/labl/Bureau/ABC2_files/originel_ASCII' # directory containing all the LNG ASCII
 
-outpath        = '/home/labl/Bureau/ABC2_files/netcdf' #'/Users/labbouz/Desktop/RESEARCH/AEROCLO/ABC2_netcdf/'  # the output files will be written here
-path_in_all    = '/home/labl/Bureau/ABC2_files/originel_ASCII' #'/Users/labbouz/Desktop/Aeroclo-sA_LNGdata/'            # directory containing all the LNG ASCII
-name_in_type   = 'ArchiveAeroclo-sA_LNG_ABC_'                    # name of the per flight directories before "Vol + number"
 in_fnames_type = 'ABC2*'   # individual input ASCII file names are of this form
 datalev        = 'level1'  # level 1 data
 expected_nblev= 2333 # number of vertical levels expected in the ASCII files (not needed but will print warning if different)
@@ -30,7 +28,6 @@ header_lines  = 43   # default number of header lines (not needed but will print
 non_rd_hlines = 5    # number of lines at the end of tyhe Header that are not readable / not usefull to read (mandatory)
 
 flight_number_range = range(6,15+1) # for processing flights number 6 to 15
-
 
 
 # ************************** Function definitions ******************************* #
@@ -110,15 +107,13 @@ def readData(fname, nb_lines=header_lines):
     return data
 
 def read_data_list (path, infile):
-    """reads the .dir file containig the file names"""
+    """reads the .dir file containing the file names"""
     f = open(path + infile)
     line =  f .read().splitlines()
     out_list = [ path + '/' + x for x in line[1:] ]
     f.close()
     return out_list
 
-
-from collections import defaultdict
 
 def list_duplicates(seq):
     """ function to get the duplicates from a list, under the form (key, locs)
@@ -256,14 +251,18 @@ def create_file(outfname, header_all, data_all, nblev, nbprofiles ):
 ## **********************************  MAIN *********************************************************** ##
 # goes through all the flights
 for volnb in flight_number_range:
-    path_in = path_in_all + name_in_type + 'Vol' + str(volnb)
+    path_in = path_in_all +'/Vol' + str(volnb) + '/'
     # only one directory per flight for level 1 data (so it's simpler here than for level 0)
     fnames = glob.glob(path_in + '/'+in_fnames_type)
+
+    # sort the filenames by their time, i.e. using the last 6 characters of the filename
+    fnames = sorted(fnames, key=lambda x: x[-6:])
 
     if len(fnames) == 0:
         raise ValueError(' the path for input file ' + path_in  + ' is empty of there is not file of type ' + in_fnames_type +'( Vol' + str(volnb) +' )')
 
     i = 0
+
 # reade all files for the flight volnb
     for name in fnames:
         if i == 0:
