@@ -137,3 +137,11 @@ def plot_2D_colormap(x, y, array2D,
     ax1.set_ylabel(ylabel)
     fig1.savefig(out_path_fig + '/' + out_name + '.' + out_type)
     plt.close(fig1)
+
+
+def find_indices(lst, condition):
+    ''' return indices verifying condition
+    the condition has to be given using lambda e.g.
+     lambda x : x > 3
+     (to return indices correspounbding to all values greater than 3)'''
+    return [i for i, elem in enumerate(lst) if condition(elem)]
