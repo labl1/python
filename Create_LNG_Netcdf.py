@@ -91,7 +91,7 @@ def readData(fname, nb_lines=header_lines):
         i = 0
 #
     for line in f.readlines():
-        # Strip any white space from line
+        # Strip any white space from line, as well as the /n for newline
         line = line.strip()
         values = line.split()
         # for each column i, corresponding value is written in the dict data (data are written one by one here)

@@ -40,7 +40,7 @@ def readHeader(fname, nb_lines_default=header_lines):
     header = {}
     # read first line
     line = f.readline()
-    # Strip any white space from line
+    # Strip any white space from line, as well as the /n for newline
     line = line.strip()
     key, value = line.split(": ")
     header[key] = []
@@ -180,9 +180,9 @@ def create_file(outfname, header_all, data_all, nblev, nbprofiles ):
 
     # global attributes
     dataset.description   = 'Backscatter measurements from the airbone Lidar LNG2 during the 2017 AEROCLO-sA campaign. ' \
-                            'This is level 1 data (Attenuated backscatter)'
+                            'This is level 1 data (Attenuated backscatter coefficient)'
     dataset.instrument_PI = 'Cyrille Flamant, LATMOS, Paris, France'
-    dataset.history       = 'NetCDF file created ' + ttime.ctime(ttime.time()) + ' by ' \
+    dataset.history       = 'NetCDF file created on ' + ttime.ctime(ttime.time()) + ' by ' \
                             'L. Labbouz from original ASCII files (ABC2* files). The python ' \
                             'scripts used can be obtained from Laurent Labbouz github repository: https://github.com/labl1/python'
 
