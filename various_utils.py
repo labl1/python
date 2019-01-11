@@ -269,7 +269,7 @@ def netcdf2geo_map(infile,indir,varname, outdir, outftype = 'ps',
         #altavg = np.nanmean(alt)
         if lsum:
             var = ncfile1.variables[varname][0, 1:-1, 1:-1, 1:-1]  # excludes 1st and last value as they are meaningless
-
+            lsumall=False
             if alt_max >= altmax:
                 lsumall=True
                 var= np.sum(var,axis=0)  # sum over level
