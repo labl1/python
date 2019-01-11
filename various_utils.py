@@ -271,6 +271,7 @@ def netcdf2geo_map(infile,indir,varname, outdir, outftype = 'ps',
             var = ncfile1.variables[varname][0, 1:-1, 1:-1, 1:-1]  # excludes 1st and last value as they are meaningless
 
             if alt_max >= altmax:
+                lsumall=True
                 var= np.sum(var,axis=0)  # sum over level
             elif alt_max > 0:
                 ialt=np.nan
@@ -324,9 +325,17 @@ def netcdf2geo_map(infile,indir,varname, outdir, outftype = 'ps',
     if vardim <= 3:
         plt.title(varname+' '+infile[:-3])
         nom_fig=varname+infile[:-3]
-    else :
-        plt.title(varname+' l '+str(lev)+ ' ( ~'+ str(int(round(altavg))) +'m ) '+infile[:-3])
+    elif not lsum:
+        plt.title(varname+' l '+str(lev)+ ' ( ~'+ str(int(round(alt[lev]))) +'m ) '+infile[:-3])
         nom_fig=varname+'_'+infile[:-3]+'_lev'+str(lev)
+    else:
+        if lsumall:
+            plt.title(varname + '(vertically summed) ' + infile[:-3])
+            nom_fig=varname+'_'+infile[:-3]+'_vertsum'
+        else:
+            plt.title(varname + '(summed up to ~'+str(int(round(alt_max)))+'m height)' + infile[:-3])
+            nom_fig=varname+'_'+infile[:-3]+'_vertsum'+str(int(round(alt_max)))
+
 
     cb.set_label(varunits, labelpad=-40, y=1.05, rotation=0)
 
