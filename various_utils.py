@@ -238,11 +238,11 @@ def netcdf2geo_map(infile,indir,varname, outdir, outftype = 'ps',
     ncfile1 = Dataset(indir+infile,'r')
     if coordfile != []:
         coorddata = Dataset(coordfile)
-        lat=coorddata.variables['LAT'][:,:]
-        lon=coorddata.variables['LON'][:,:]
+        lat=coorddata.variables['LAT'][1:-1,1:-1]
+        lon=coorddata.variables['LON'][1:-1,1:-1]
     else:
-        lat=ncfile1.variables['LAT'][:,:]
-        lon=ncfile1.variables['LON'][:,:]
+        lat=ncfile1.variables['LAT'][1:-1,1:-1]
+        lon=ncfile1.variables['LON'][1:-1,1:-1]
     latmin=np.nanmin(lat)
     latmax=np.nanmax(lat)
     lonmin=np.nanmin(lon)
@@ -285,11 +285,11 @@ def netcdf2geo_map(infile,indir,varname, outdir, outftype = 'ps',
                 print('alt_max =', alt_max)
                 raise(ValueError,'invalid altmax value')
         else:
-            var=ncfile1.variables[varname][0,lev,:,:]
+            var=ncfile1.variables[varname][0, lev, 1:-1, 1:-1]
     elif vardim == 3:
-        var=ncfile1.variables[varname][0,:,:]
+        var=ncfile1.variables[varname][0, 1:-1, 1:-1]
     elif vardim == 2:
-        var=ncfile1.variables[varname][:,:]
+        var=ncfile1.variables[varname][1:-1, 1:-1]
     else:
         raise ValueError('vardim is %i instead of 2, 3 or 4 for variable %s in file %s ' % (vardim, varname, infile) )
     var[np.where(var==nan_val)]=float('nan')
