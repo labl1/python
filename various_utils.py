@@ -181,7 +181,7 @@ def get_profile_mnh(infile, indir, varname, inres, loc_lat, loc_lon,
     ncfile1 = Dataset(indir + infile, 'r')
     lat = ncfile1.variables['LAT'][:, :]
     lon = ncfile1.variables['LON'][:, :]
-
+    time = ncfile1.variables['time']
     var = ncfile1.variables[varname][:, :]
 
     for index, item in enumerate(lat[:, 0]):
@@ -223,7 +223,7 @@ def get_profile_mnh(infile, indir, varname, inres, loc_lat, loc_lon,
     var_loc = [var[0, :, i, j] for i in ilon for j in ilat]
     var_avg = np.nanmean(var_loc, axis=0)
 
-    return var_avg, alt, varunits
+    return var_avg, alt, varunits, time
 
 
 def plot_profile_mnh(infile, indir, allnames, inres, loc_lat, loc_lon, outdir, outname, outftype='ps',
