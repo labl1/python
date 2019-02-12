@@ -11,6 +11,8 @@ from mpl_toolkits.basemap import Basemap
 from matplotlib.cm import get_cmap as get_cmap
 from netCDF4 import Dataset
 from math import pi
+import warnings
+from math import sqrt
 import os
 
 def str2float(list_str):
@@ -160,8 +162,103 @@ def find_indices(lst, condition):
 # TODO add function for 2D height - time profiles
 
 def get_profile_mnh(infile, indir, varname, inres, loc_lat, loc_lon,
-                    nan_val=999., inunits=[]):
+                    nan_val=999., inunits=[], lclosest=False):
     ''' function to get the average profile from the nearest model gridcolumns
+     the return array is the average of all the model gridcolumn that are less than inres km away from (loc_lat,loc_lon)
+     infile : input file name
+     indir  : input directory full path
+     varname: name of tyhe variable to retrieve
+     inres  : resolution of the input data (km)
+     loc_lat: latitude of desired location for the profiles
+     loc_lon: longitude of ...
+     nan_val: value of NaNs in input file
+     inunits: units can be specified here, otherwise it will be read in netcdf file and if absent "unk" will be used
+     lclosest : if true returns only the profile closest to the specified location (rather than the average of the closest profiles)
+     '''
+
+    ilat = []
+    latval = []
+    ilon = []
+    lonval = []
+    if lclosest:
+        ddlat = []
+        ddlon =[]
+    inres_lat = inres / 111.  # in degrees of latitude
+    ncfile1 = Dataset(indir + infile, 'r')
+    lat = ncfile1.variables['LAT'][:, :]
+    lon = ncfile1.variables['LON'][:, :]
+    time = ncfile1.variables['time']
+    var = ncfile1.variables[varname][:, :,:,:]
+
+
+    for index, item in enumerate(lat[:, 0]):
+        dlat = np.abs(item - loc_lat)
+        if dlat <= inres_lat:
+            ilat = ilat + [index]  # store all the indices corresponding to the criteria
+            latval = latval + [item]
+            if lclosest:
+                ddlat= ddlat + [dlat]
+
+    # MNH resolution in degrees of longitude
+    inres_lon = inres_lat / np.cos(np.max(latval) * pi / 180.)
+    for index, item in enumerate(lon[0, :]):
+        dlon = np.abs(item - loc_lon)
+        if dlon <= inres_lon:
+            ilon = ilon + [index]  # store all the indices corresponding to the criteria
+            lonval = lonval + [item]
+            if lclosest:
+                ddlon= ddlon + [dlon]
+
+    # minimum distance
+    if lclosest:
+
+        ddist =  np.sqrt( ( ddlon * 111.* np.cos(np.mean(latval) * pi / 180.) )**2  + ( ddlat * 111. ) **2 )
+        iimin = np.argmin(ddist)
+        # replace multiple value to average by single value to use
+        dcoeff = np.cos(np.mean(latval) * pi / 180.)
+        ddist = [( (lon[i, j] - loc_lon ) * np.cos(np.mean(lat[i,j]) * pi / 180.) )**2  +  ( (lat[i,j] - loc_lat) )**2  for i in ilon for j in ilat]
+        ii, jj = np.unravel_index(ddist.argmin(), (len(ilon), len(ilat)))
+        llon = lon[ii, jj]
+        llat = lat[ii, jj]
+        # replace position only by the closest
+        ilon = ilon[ii]
+        ilat = ilat[jj]
+
+
+    vardim = len(ncfile1.variables[varname].shape)
+    if inunits == []:
+        try:
+            varunits = ncfile1.variables[varname].units
+        except:
+            varunits = 'unk'
+            warnings.warn('variable %s units are not specified in the netcdf'
+                 'file neither in the function call - set to unk' % (varname))
+    else:
+        varunits = inunits
+
+    if vardim == 4:
+        # alt=ncfile1.variables['ALT'][lev,:,:]
+        alt = ncfile1.variables['level'][:]
+        # NB: not much sense here as altitude is a scalar - TODO put instead the actual altitude AMSL (rather than the level => use dia files)
+        altmin = np.nanmin(alt)
+        altmax = np.nanmax(alt)
+        altavg = np.nanmean(alt)
+
+    else:
+
+        raise ValueError('vardim is %i instead of 4 for variable %s in file %s ' % (vardim, varname, infile))
+
+    var[np.where(var == nan_val)] = np.nan  # or float('nan')
+
+    var_loc = [var[0, :, i, j] for i in ilon for j in ilat]
+    var_avg = np.nanmean(var_loc, axis=0)
+
+    return var_avg, alt, varunits, time
+
+
+def get_point_mnh(infile, indir, varname, inres, loc_lat, loc_lon,
+                    nan_val=999., inunits=[]):
+    ''' function to get the value of a vriable at a given lon-lat point by averaging MNH neighbooring gridpoints
      the return array is the average of all the model gridcolumn that are less than inres km away from (loc_lat,loc_lon)
      infile : input file name
      indir  : input directory full path
@@ -182,7 +279,7 @@ def get_profile_mnh(infile, indir, varname, inres, loc_lat, loc_lon,
     lat = ncfile1.variables['LAT'][:, :]
     lon = ncfile1.variables['LON'][:, :]
     time = ncfile1.variables['time']
-    var = ncfile1.variables[varname][:, :]
+    var = ncfile1.variables[varname][:, :,:]
 
     for index, item in enumerate(lat[:, 0]):
         if np.abs(item - loc_lat) <= inres_lat:
@@ -202,28 +299,21 @@ def get_profile_mnh(infile, indir, varname, inres, loc_lat, loc_lon,
             varunits = ncfile1.variables[varname].units
         except:
             varunits = 'unk'
-            warn('variable %s units are not specified in the netcdf'
+            warnings.warn('variable %s units are not specified in the netcdf'
                  'file neither in the function call - set to unk' % (varname))
     else:
         varunits = inunits
 
-    if vardim == 4:
-        # alt=ncfile1.variables['ALT'][lev,:,:]
-        alt = ncfile1.variables['level'][:]
-        # NB: not much sense here as altitude is a scalar - TODO put instead the actual altitude AMSL (rather than the level => use dia files)
-        altmin = np.nanmin(alt)
-        altmax = np.nanmax(alt)
-        altavg = np.nanmean(alt)
 
-    else:
+    if vardim != 3 :
         raise ValueError('vardim is %i instead of 4 for variable %s in file %s ' % (vardim, varname, infile))
 
     var[np.where(var == nan_val)] = np.nan  # or float('nan')
 
-    var_loc = [var[0, :, i, j] for i in ilon for j in ilat]
+    var_loc = [var[0, i, j] for i in ilon for j in ilat]
     var_avg = np.nanmean(var_loc, axis=0)
 
-    return var_avg, alt, varunits, time
+    return var_avg,varunits, time
 
 
 def plot_profile_mnh(infile, indir, allnames, inres, loc_lat, loc_lon, outdir, outname, outftype='ps',
@@ -232,7 +322,9 @@ def plot_profile_mnh(infile, indir, allnames, inres, loc_lat, loc_lon, outdir, o
                      dlatlabel=4., dlonlabel=4., lev=5, islog=False,
                      xlabel=[], ylabel=[], title=[]):
     ''' loc = lon, lat of the location at which a profile is to be plotted
-        inres = model resolution in km '''
+        inres = model resolution in km
+        outname = output file name
+        '''
 
     ilat = []
     latval = []
@@ -250,8 +342,7 @@ def plot_profile_mnh(infile, indir, allnames, inres, loc_lat, loc_lon, outdir, o
     for varname in allnames:
 
 
-        var_avg, alt, varunits = get_profile_mnh(infile, indir, varname, inres, loc_lat, loc_lon,
-                nan_val, inunits)
+        var_avg, alt, varunits = get_profile_mnh(infile, indir, varname, inres, loc_lat, loc_lon, nan_val, inunits)
         # TODO instead of alt put the actual altitude AMSL (rather than the level => use dia files)
 
 
@@ -275,9 +366,10 @@ def plot_profile_mnh(infile, indir, allnames, inres, loc_lat, loc_lon, outdir, o
         plt.close(fig1)
 
 def netcdf2geo_map(infile,indir,varname, outdir, outftype = 'ps',
-                   colmap='rainbow',colorlev = 10, cmin = np.nan, cmax=np.nan,
+                   colmap='rainbow',colorlev = 10, cmin = [], cmax=[],
                    cticks=[], proj='merc', nan_val=999.,
-                   dlatlabel = 4., dlonlabel = 4. , lev = 5, alt_max = 999.e3, lsum = False, islog=False, coordfile = []):
+                   dlatlabel = 4., dlonlabel = 4. , lev = 21, alt_max = 999.e3, lsum = False, islog=False, coordfile = [],
+                   ladd_arrow_wind=False, windfile=[], LSwind=False, cmapextend = 'both'):
     ''' plot geographical maps of a given quantity (2D or 3D in which case a level should be specified
         ifile:    name of the input netcdf file
         idir:     input directory full path
@@ -295,13 +387,15 @@ def netcdf2geo_map(infile,indir,varname, outdir, outftype = 'ps',
         coordfile : full path of the file containing the coordinates LAT and LON, if this is not the input file itself
                   : leave empty if using the input file
         lsum      : if true, variable will be sum along the vertical from the ground to alt_max (m) (or to the highest model level)
-
-
+        lswind    : to use the large-scale wind (coming from the coupling files) rather than the actueal model wind
          '''
 # TODO: quite slow -> Why ?? =>> make it faster
-    if np.size(colorlev) == 1 and np.isreal(cmin) and np.isreal(cmax):
+    lcollev = False
+    if np.size(colorlev) == 1 and cmin!=[] and cmax!=[]:
         colorlev = np.linspace(cmin, cmax, colorlev)
-
+        lcollev = True
+    elif np.size(colorlev) > 1:
+        lcollev = True
 
 # TODO plot profile + better projection (?)
     ncfile1 = Dataset(indir+infile,'r')
@@ -310,12 +404,21 @@ def netcdf2geo_map(infile,indir,varname, outdir, outftype = 'ps',
         lat=coorddata.variables['LAT'][1:-1,1:-1]
         lon=coorddata.variables['LON'][1:-1,1:-1]
     else:
-        lat=ncfile1.variables['LAT'][1:-1,1:-1]
-        lon=ncfile1.variables['LON'][1:-1,1:-1]
+        try:
+            lat=ncfile1.variables['LAT'][1:-1,1:-1]
+            lon=ncfile1.variables['LON'][1:-1,1:-1]
+        except:
+            lat=ncfile1.variables['latitude'][1:-1,1:-1]
+            lon=ncfile1.variables['longitude'][1:-1,1:-1]
+
     latmin=np.nanmin(lat)
     latmax=np.nanmax(lat)
     lonmin=np.nanmin(lon)
     lonmax=np.nanmax(lon)
+
+    # lat and lon centre points (used for projection)
+    latcen = np.mean(lat[:,0])
+    loncen = np.mean(lon[0,:])
     '''
     print('latmin lat max, lonmin / max',latmin,latmax,lonmin,lonmax)
     print('corners')
@@ -324,8 +427,10 @@ def netcdf2geo_map(infile,indir,varname, outdir, outftype = 'ps',
     print(lat[-1,-1], lon[-1,-1])
     print(lat[0,-1], lon[0,-1])
     '''
-
-    vardim = len(ncfile1.variables[varname].shape)
+    try :
+        vardim = len(ncfile1.variables[varname].shape)
+    except:
+        vardim = 4 # for windspeed case, where varname cannot be read directly
     try:
         varunits = ncfile1.variables[varname].units
     except:
@@ -356,15 +461,57 @@ def netcdf2geo_map(infile,indir,varname, outdir, outftype = 'ps',
                 print('alt_max =', alt_max)
                 raise(ValueError,'invalid altmax value')
         else:
-            var=ncfile1.variables[varname][0, lev, 1:-1, 1:-1]
+            if varname=='windspeed':
+                var= np.sqrt(ncfile1.variables['UT'][0, lev+1, 1:-1, 1:-1]** 2 +
+                 ncfile1.variables['VT'][0, lev+1, 1:-1, 1:-1]**2)
+            elif varname == 'LSwindspeed':
+                var= np.sqrt(ncfile1.variables['LSUM'][0, lev+1, 1:-1, 1:-1]**2 +
+                 ncfile1.variables['LSVM'][0, lev+1, 1:-1, 1:-1]**2)
+            elif varname == 'winddiff':
+                pass
+            else:
+                var= ncfile1.variables[varname][0, lev+1, 1:-1, 1:-1]
+
     elif vardim == 3:
         var=ncfile1.variables[varname][0, 1:-1, 1:-1]
     elif vardim == 2:
         var=ncfile1.variables[varname][1:-1, 1:-1]
     else:
         raise ValueError('vardim is %i instead of 2, 3 or 4 for variable %s in file %s ' % (vardim, varname, infile) )
-    var[np.where(var==nan_val)]=float('nan')
 
+    if ladd_arrow_wind:
+        if varname != 'winddiff':
+            if LSwind:
+                uname = 'LSUM'
+                vname = 'LSVM'
+            else:
+                uname = 'UT'
+                vname='VT'
+
+            if windfile == []:
+                UU = ncfile1.variables[uname][0, lev+1, 1:-1, 1:-1]
+                VV = ncfile1.variables[vname][0, lev+1, 1:-1, 1:-1]
+            else:
+                ncfilew=Dataset(windfile,'r')
+                UU = ncfilew.variables[uname][0, lev+1, 1:-1, 1:-1]
+                VV = ncfilew.variables[vname][0, lev+1, 1:-1, 1:-1]
+        else:
+            if windfile == []:
+                UU = ncfile1.variables['UT'][0, lev+1, 1:-1, 1:-1] - ncfile1.variables['LSUM'][0, lev+1, 1:-1, 1:-1]
+                VV = ncfile1.variables['VT'][0, lev+1, 1:-1, 1:-1] - ncfile1.variables['LSVM'][0, lev+1, 1:-1, 1:-1]
+            else:
+                ncfilew=Dataset(windfile,'r')
+                UU = ncfilew.variables['UT'][0, lev+1, 1:-1, 1:-1] - ncfilew.variables['LSUM'][0, lev+1, 1:-1, 1:-1]
+                VV = ncfilew.variables['VT'][0, lev+1, 1:-1, 1:-1] - ncfilew.variables['LSVM'][0, lev+1, 1:-1, 1:-1]
+            var = np.sqrt(UU**2 + VV**2)
+
+
+
+
+
+## TODO replace by cartopy as basemap is deprecated
+## as the lon - lat coordinates are calculated, the choice of projection is free - although Mercator with PGD central points is used in MNH
+## (actually still quite surprisefd of this behaviour and having square-gridcolumn in DEGREES meaning resolution is not constant in km, I would have assumed the exact opposite!)
     m = Basemap(resolution='h',   projection=proj,
                 llcrnrlat=lat[0,0], urcrnrlat=lat[-1,-1],
                 llcrnrlon=lon[0,0], urcrnrlon=lon[-1,-1])
@@ -380,13 +527,22 @@ def netcdf2geo_map(infile,indir,varname, outdir, outftype = 'ps',
 
     x,y = m(lon,lat)
     if not islog:
-        cs = m.contourf(x,y,var,
-                levels = colorlev
-                ,cmap=get_cmap(colmap),extend='both')
+        if lcollev:
+            cs = m.contourf(x,y,var,
+                levels = colorlev,
+                cmap=get_cmap(colmap),extend=cmapextend)
+        else:
+            cs = m.contourf(x,y,var,
+            cmap=get_cmap(colmap))
     else:
-        cs = m.contourf(x, y, var, norm=colors.LogNorm(),
+        if lcollev:
+            cs = m.contourf(x, y, var, norm=colors.LogNorm(),
                         levels = colorlev,
-                        cmap=get_cmap(colmap), extend='both') # extend changed from neither to both
+                        cmap=get_cmap(colmap), extend=cmapextend) # extend changed from neither to both
+        else:
+            cs = m.contourf(x, y, var, norm=colors.LogNorm(),
+            cmap=get_cmap(colmap)) # extend changed from neither to both
+
     if len(cticks) > 2:
         cb=plt.colorbar(cs,ticks=cticks)
     else:
@@ -409,6 +565,10 @@ def netcdf2geo_map(infile,indir,varname, outdir, outftype = 'ps',
 
 
     cb.set_label(varunits, labelpad=-40, y=1.05, rotation=0)
+
+
+    if ladd_arrow_wind:
+        m.quiver(x[0::10,0::10],y[0::10,0::10], UU[0::10,0::10], VV[0::10,0::10])
 
     plt.savefig(outdir+nom_fig+'.'+outftype,format=outftype, bbox_inches = 'tight',
     pad_inches = 0)
