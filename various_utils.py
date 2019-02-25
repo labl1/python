@@ -236,7 +236,7 @@ def get_profile_mnh(infile, indir, varname, inres, loc_lat, loc_lon,
     time = ncfile1.variables['time']
     var = ncfile1.variables[varname][:, :,:,:]
 
-    ilon,ilat = get_indices_coord(lon,lat,loc_lat,loc_lon, inres, lclosest)
+    ilon,ilat = get_indices_coords(lon,lat,loc_lat,loc_lon, inres, lclosest)
 
 
     vardim = len(ncfile1.variables[varname].shape)
@@ -294,7 +294,7 @@ def get_point_mnh(infile, indir, varname, inres, loc_lat, loc_lon,
     time = ncfile1.variables['time']
     var = ncfile1.variables[varname][:, :,:]
 
-    ilon,ilat = get_indices_coord(lon,lat,loc_lat,loc_lon, inres, lclosest)
+    ilon,ilat = get_indices_coords(lon,lat,loc_lat,loc_lon, inres, lclosest)
 
 
     vardim = len(ncfile1.variables[varname].shape)
