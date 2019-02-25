@@ -161,35 +161,24 @@ def find_indices(lst, condition):
 # plot profile
 # TODO add function for 2D height - time profiles
 
-def get_profile_mnh(infile, indir, varname, inres, loc_lat, loc_lon,
-                    nan_val=999., inunits=[], lclosest=False):
-    ''' function to get the average profile from the nearest model gridcolumns
-     the return array is the average of all the model gridcolumn that are less than inres km away from (loc_lat,loc_lon)
-     infile : input file name
-     indir  : input directory full path
-     varname: name of tyhe variable to retrieve
-     inres  : resolution of the input data (km)
-     loc_lat: latitude of desired location for the profiles
-     loc_lon: longitude of ...
-     nan_val: value of NaNs in input file
-     inunits: units can be specified here, otherwise it will be read in netcdf file and if absent "unk" will be used
-     lclosest : if true returns only the profile closest to the specified location (rather than the average of the closest profiles)
-     '''
+def get_indices_coords(lon,lat,loc_lat,loc_lon, inres,lclosest):
+    ''' return the indices ilon and ilat corresponding to all the points less than inres_lat degrees away in latitude,
+        and the corresponding distance in longitude; if lcolsest only the closest point is returned
+        used in get_point_mnh and get_profile_mnh
+         input :
+         loc_lat, loc_lon : coordinates of the point to be searched for in lon,lat
+         inres_lat : resolution of the input latitude and longitudes (in degrees)
 
+         '''
     ilat = []
-    latval = []
     ilon = []
+    latval = []
     lonval = []
     if lclosest:
         ddlat = []
         ddlon =[]
-    inres_lat = inres / 111.  # in degrees of latitude
-    ncfile1 = Dataset(indir + infile, 'r')
-    lat = ncfile1.variables['LAT'][:, :]
-    lon = ncfile1.variables['LON'][:, :]
-    time = ncfile1.variables['time']
-    var = ncfile1.variables[varname][:, :,:,:]
 
+    inres_lat = inres / 111.  # in degrees of latitude
 
     for index, item in enumerate(lat[:, 0]):
         dlat = np.abs(item - loc_lat)
@@ -211,18 +200,43 @@ def get_profile_mnh(infile, indir, varname, inres, loc_lat, loc_lon,
 
     # minimum distance
     if lclosest:
-
-        ddist =  np.sqrt( ( ddlon * 111.* np.cos(np.mean(latval) * pi / 180.) )**2  + ( ddlat * 111. ) **2 )
-        iimin = np.argmin(ddist)
+        #TODO: make it faster by searching only in a subset of the array and hence avoiding useless calculations
         # replace multiple value to average by single value to use
-        dcoeff = np.cos(np.mean(latval) * pi / 180.)
-        ddist = [( (lon[i, j] - loc_lon ) * np.cos(np.mean(lat[i,j]) * pi / 180.) )**2  +  ( (lat[i,j] - loc_lat) )**2  for i in ilon for j in ilat]
+        ddist = np.array([( (lon[0, i] - loc_lon ) * np.cos(np.mean(lat[i,j]) * pi / 180.) )**2  +
+                          ( (lat[j, 0] - loc_lat) )**2  for i in ilon for j in ilat])
         ii, jj = np.unravel_index(ddist.argmin(), (len(ilon), len(ilat)))
-        llon = lon[ii, jj]
-        llat = lat[ii, jj]
+        # correspounding lon and lat
+        #llon = lon[ii, jj]
+        #llat = lat[ii, jj]
         # replace position only by the closest
         ilon = ilon[ii]
         ilat = ilat[jj]
+
+    return ilon,ilat
+
+
+def get_profile_mnh(infile, indir, varname, inres, loc_lat, loc_lon,
+                    nan_val=999., inunits=[], lclosest=False):
+    ''' function to get the average profile from the nearest model gridcolumns
+     the return array is the average of all the model gridcolumn that are less than inres km away from (loc_lat,loc_lon)
+     infile : input file name
+     indir  : input directory full path
+     varname: name of tyhe variable to retrieve
+     inres  : resolution of the input data (km)
+     loc_lat: latitude of desired location for the profiles
+     loc_lon: longitude of ...
+     nan_val: value of NaNs in input file
+     inunits: units can be specified here, otherwise it will be read in netcdf file and if absent "unk" will be used
+     lclosest : if true returns only the profile closest to the specified location (rather than the average of the closest profiles)
+     '''
+
+    ncfile1 = Dataset(indir + infile, 'r')
+    lat = ncfile1.variables['LAT'][:, :]
+    lon = ncfile1.variables['LON'][:, :]
+    time = ncfile1.variables['time']
+    var = ncfile1.variables[varname][:, :,:,:]
+
+    ilon,ilat = get_indices_coord(lon,lat,loc_lat,loc_lon, inres, lclosest)
 
 
     vardim = len(ncfile1.variables[varname].shape)
@@ -250,14 +264,17 @@ def get_profile_mnh(infile, indir, varname, inres, loc_lat, loc_lon,
 
     var[np.where(var == nan_val)] = np.nan  # or float('nan')
 
-    var_loc = [var[0, :, i, j] for i in ilon for j in ilat]
-    var_avg = np.nanmean(var_loc, axis=0)
+    if not lclosest:
+        var_loc = [var[0, :, i, j] for i in ilon for j in ilat]
+        var_avg = np.nanmean(var_loc, axis=0)
+    else:
+        var_avg = var[0, :, ilon, ilat]
 
-    return var_avg, alt, varunits, time
+    return var_avg, alt, varunits, time,ilon,ilat
 
 
 def get_point_mnh(infile, indir, varname, inres, loc_lat, loc_lon,
-                    nan_val=999., inunits=[]):
+                    nan_val=999., inunits=[], lclosest=False):
     ''' function to get the value of a vriable at a given lon-lat point by averaging MNH neighbooring gridpoints
      the return array is the average of all the model gridcolumn that are less than inres km away from (loc_lat,loc_lon)
      infile : input file name
@@ -268,30 +285,17 @@ def get_point_mnh(infile, indir, varname, inres, loc_lat, loc_lon,
      loc_lon: longitude of ...
      nan_val: value of NaNs in input file
      inunits: units can be specified here, otherwise it will be read in netcdf file and if absent "unk" will be used
+     lclosest : if True no averaging is done and the closest location is used instrad
      '''
 
-    ilat = []
-    latval = []
-    ilon = []
-    lonval = []
-    inres_lat = inres / 111.  # in degrees of latitude
     ncfile1 = Dataset(indir + infile, 'r')
     lat = ncfile1.variables['LAT'][:, :]
     lon = ncfile1.variables['LON'][:, :]
     time = ncfile1.variables['time']
     var = ncfile1.variables[varname][:, :,:]
 
-    for index, item in enumerate(lat[:, 0]):
-        if np.abs(item - loc_lat) <= inres_lat:
-            ilat = ilat + [index]  # store all the indices corresponding to the criteria
-            latval = latval + [item]
+    ilon,ilat = get_indices_coord(lon,lat,loc_lat,loc_lon, inres, lclosest)
 
-    # MNH resolution in degrees of longitude
-    inres_lon = inres_lat / np.cos(np.max(latval) * pi / 180.)
-    for index, item in enumerate(lon[0, :]):
-        if np.abs(item - loc_lon) <= inres_lon:
-            ilon = ilon + [index]  # store all the indices corresponding to the criteria
-            lonval = lonval + [item]
 
     vardim = len(ncfile1.variables[varname].shape)
     if inunits == []:
@@ -309,11 +313,13 @@ def get_point_mnh(infile, indir, varname, inres, loc_lat, loc_lon,
         raise ValueError('vardim is %i instead of 4 for variable %s in file %s ' % (vardim, varname, infile))
 
     var[np.where(var == nan_val)] = np.nan  # or float('nan')
+    if not lclosest:
+        var_loc = [var[0, i, j] for i in ilon for j in ilat]
+        var_avg = np.nanmean(var_loc, axis=0)
+    else:
+        var_avg = var[0, ilon, ilat]
 
-    var_loc = [var[0, i, j] for i in ilon for j in ilat]
-    var_avg = np.nanmean(var_loc, axis=0)
-
-    return var_avg,varunits, time
+    return var_avg,varunits, time, ilon, ilat
 
 
 def plot_profile_mnh(infile, indir, allnames, inres, loc_lat, loc_lon, outdir, outname, outftype='ps',
@@ -521,6 +527,27 @@ def netcdf2geo_map(infile,indir,varname, outdir, outftype = 'ps',
                 color='grey',linewidth=0.1,fontsize=8) #,labelstyle='+/-'
     m.drawmeridians(np.arange(round(lonmin,1),round(lonmax,1),dlonlabel),labels=[0,0,0,1],rotation=45,
                 color='grey',linewidth=0.1,fontsize=8) #,labelstyle='+/-'
+
+
+'''
+# watch updates of gridliner == not sure it supports rotated labels ...
+proj = cartopy.crs.Mercator()
+ax = plt.axes(projection=proj)
+
+ax.add_feature(cartopy.feature.COASTLINE)
+ax.add_feature(cartopy.feature.BORDERS, linestyle='-')
+ax.set_extent([lonmin, lonmax, latmin, latmax])
+ax.gridlines(crs=proj, draw_labels=True)
+
+gl = ax.gridlines(crs=proj, draw_labels=True)
+gl.xformatter = LONGITUDE_FORMATTER
+gl.yformatter = LATITUDE_FORMATTER
+gl.xlocator = mticker.FixedLocator(np.arange(round(-18.65),round(57.23),dlatlabel))
+gl.xlabels_top = False
+gl.ylabels_right = False
+# plt.xticks(rotation='45') ## doesn't work here, need to apply rotation on grilines gl
+
+'''
 
 
 #cticks = [290,295,300,305,310,315,320,325,330,335,340,345,350,355,360]
