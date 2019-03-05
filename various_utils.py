@@ -231,8 +231,12 @@ def get_profile_mnh(infile, indir, varname, inres, loc_lat, loc_lon,
      '''
 
     ncfile1 = Dataset(indir + infile, 'r')
-    lat = ncfile1.variables['LAT'][:, :]
-    lon = ncfile1.variables['LON'][:, :]
+    try:
+        lat = ncfile1.variables['LAT'][:, :]
+        lon = ncfile1.variables['LON'][:, :]
+    except:
+        lat = ncfile1.variables['latitude'][:, :]
+        lon = ncfile1.variables['longitude'][:, :]
     time = ncfile1.variables['time']
     var = ncfile1.variables[varname][:, :,:,:]
 
@@ -262,7 +266,8 @@ def get_profile_mnh(infile, indir, varname, inres, loc_lat, loc_lon,
 
         raise ValueError('vardim is %i instead of 4 for variable %s in file %s ' % (vardim, varname, infile))
 
-    var[np.where(var == nan_val)] = np.nan  # or float('nan')
+    if ( np.size(np.where(var == nan_val)) > 0 ):
+        var[np.where(var == nan_val)] = np.nan  # or float('nan')
 
     if not lclosest:
         var_loc = [var[0, :, i, j] for i in ilon for j in ilat]
@@ -529,28 +534,28 @@ def netcdf2geo_map(infile,indir,varname, outdir, outftype = 'ps',
                 color='grey',linewidth=0.1,fontsize=8) #,labelstyle='+/-'
 
 
-'''
-# watch updates of gridliner == not sure it supports rotated labels ...
-proj = cartopy.crs.Mercator()
-ax = plt.axes(projection=proj)
+    '''
+    # watch updates of gridliner == not sure it supports rotated labels ...
+    proj = cartopy.crs.Mercator()
+    ax = plt.axes(projection=proj)
+    
+    ax.add_feature(cartopy.feature.COASTLINE)
+    ax.add_feature(cartopy.feature.BORDERS, linestyle='-')
+    ax.set_extent([lonmin, lonmax, latmin, latmax])
+    ax.gridlines(crs=proj, draw_labels=True)
+    
+    gl = ax.gridlines(crs=proj, draw_labels=True)
+    gl.xformatter = LONGITUDE_FORMATTER
+    gl.yformatter = LATITUDE_FORMATTER
+    gl.xlocator = mticker.FixedLocator(np.arange(round(-18.65),round(57.23),dlatlabel))
+    gl.xlabels_top = False
+    gl.ylabels_right = False
+    # plt.xticks(rotation='45') ## doesn't work here, need to apply rotation on grilines gl
+    
+    '''
 
-ax.add_feature(cartopy.feature.COASTLINE)
-ax.add_feature(cartopy.feature.BORDERS, linestyle='-')
-ax.set_extent([lonmin, lonmax, latmin, latmax])
-ax.gridlines(crs=proj, draw_labels=True)
 
-gl = ax.gridlines(crs=proj, draw_labels=True)
-gl.xformatter = LONGITUDE_FORMATTER
-gl.yformatter = LATITUDE_FORMATTER
-gl.xlocator = mticker.FixedLocator(np.arange(round(-18.65),round(57.23),dlatlabel))
-gl.xlabels_top = False
-gl.ylabels_right = False
-# plt.xticks(rotation='45') ## doesn't work here, need to apply rotation on grilines gl
-
-'''
-
-
-#cticks = [290,295,300,305,310,315,320,325,330,335,340,345,350,355,360]
+    #cticks = [290,295,300,305,310,315,320,325,330,335,340,345,350,355,360]
 
     x,y = m(lon,lat)
     if not islog:
