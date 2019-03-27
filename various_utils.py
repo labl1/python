@@ -122,6 +122,11 @@ def create_hist1D_plot(array_tuple, legend_tuple, hrange,
     fig1.savefig(out_path + '/' + out_name + '.'       + out_type)
     fig2.savefig(out_path + '/' + out_name + '_cumul.' + out_type)
 
+    if nbplt ==1:
+        return bin_centers, hist
+
+
+
 # --------*********************************************************---------------------------------------------- #
 
 def plot_2D_colormap(x, y, array2D,
@@ -399,6 +404,7 @@ def netcdf2geo_map(infile,indir,varname, outdir, outftype = 'ps',
                   : leave empty if using the input file
         lsum      : if true, variable will be sum along the vertical from the ground to alt_max (m) (or to the highest model level)
         lswind    : to use the large-scale wind (coming from the coupling files) rather than the actueal model wind
+        cmapextend: extend the colorbar both direction beyond the colorbar limits (NB : no available with log colorscale)
          '''
 # TODO: quite slow -> Why ?? =>> make it faster
     lcollev = False
@@ -570,7 +576,7 @@ def netcdf2geo_map(infile,indir,varname, outdir, outftype = 'ps',
         if lcollev:
             cs = m.contourf(x, y, var, norm=colors.LogNorm(),
                         levels = colorlev,
-                        cmap=get_cmap(colmap), extend=cmapextend) # extend changed from neither to both
+                        cmap=get_cmap(colmap) ) #, extend=cmapextend)
         else:
             cs = m.contourf(x, y, var, norm=colors.LogNorm(),
             cmap=get_cmap(colmap)) # extend changed from neither to both
@@ -580,20 +586,24 @@ def netcdf2geo_map(infile,indir,varname, outdir, outftype = 'ps',
     else:
         cb=plt.colorbar(cs)
 
+    if not islog:
+        log_tag = ''
+    else:
+        log_tag = '_log'
 
     if vardim <= 3:
         plt.title(varname+' '+infile[:-3])
-        nom_fig=varname+infile[:-3]
+        nom_fig=varname+infile[:-3] + log_tag
     elif not lsum:
         plt.title(varname+' l '+str(lev)+ ' ( ~'+ str(int(round(alt[lev]))) +'m ) '+infile[:-3])
-        nom_fig=varname+'_'+infile[:-3]+'_lev'+str(lev)
+        nom_fig=varname+'_'+infile[:-3]+'_lev'+str(lev) + log_tag
     else:
         if lsumall:
             plt.title(varname + '(vertically summed) ' + infile[:-3])
-            nom_fig=varname+'_'+infile[:-3]+'_vertsum'
+            nom_fig=varname+'_'+infile[:-3]+'_vertsum' + log_tag
         else:
             plt.title(varname + '(summed up to ~'+str(int(round(alt_max)))+'m height)' + infile[:-3])
-            nom_fig=varname+'_'+infile[:-3]+'_vertsum'+str(int(round(alt_max)))
+            nom_fig=varname+'_'+infile[:-3]+'_vertsum'+str(int(round(alt_max))) +log_tag
 
 
     cb.set_label(varunits, labelpad=-40, y=1.05, rotation=0)

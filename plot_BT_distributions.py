@@ -15,22 +15,25 @@ from various_utils import create_hist1D_plot, LT_hour, plot_2D_colormap
 
 # ----------------------- variables to edit ---------------------------
 # directories containing the MSG and Meso-NH netcdf file
-filedir_obs='/home/labl/Bureau/MSG_OBS_WAL54/' 
-filedir_mnh='/home/labl/Bureau/MSG_mnh_WAL54/'
+filedir_obs='/home/labl/Bureau/MSG_OBS_WAL54/'
+filedir_mnh='/home/labl/Bureau/MSG_mnh_WAL54b/BG54b_01-130908_15UTC_MSG108/'
+filedir_mnh2='/home/labl/Bureau/MSG_mnh_WAL54b/BG54b_01-130908_15UTC_MSG108/'
 # Meso-NH experiment name
-mnh_exp='BIG54'
+mnh_exp='BG54b'
 
 # output directory 
-out_dir='/home/labl/Bureau/BIG54_figures/'
+out_dir='/home/labl/Bureau/BG54b_figures/'
 
 YYYYMM   = "201709"
 strmonth = 'SEP'
 # start and end day (from 00UTC to 23UTC)
-dstart =3
-dend   =11
+dstart =3  #1
+dend   =11 #13
 
+lobs = False     # using MSG obs or not for histograms (NB: mind the possible differences between MNH grids and the processed MSG data from JPC)
+lobs_2D = False # 2D maps from obseravtions
 # file used fior lat and lon coordinates of the gridded model (and MSG) points
-coord_file = filedir_mnh + 'BIG54.1.SEP03.021dia_MSG108.nc'
+coord_file = filedir_mnh + 'BG54b.1.SEP02.001dia_MSG108.nc' #''BG54b.1.SEP03.021dia_MSG108.nc'
 
 # ----------------------- functions ----------------------------------- #
 
@@ -124,19 +127,19 @@ def create_2D_hist_LT(array3D, hrange, lon_arr, nbins=100, daily_tsteps = 24):
 
     return hist_2D_LT, bin_centers
 
-def plot_averages(hist2D_LT_obs, hist2D_LT_mnh, bin_centers,minBT_str, out_path_fig = out_dir):
-    hist_temp     = np.empty_like(hist2D_LT_obs)
+def plot_averages(hist2D_LT_obs, hist2D_LT_mnh, bin_centers,minBT_str, out_path_fig = out_dir, llobs = True):
+    if llobs : hist_temp     = np.empty_like(hist2D_LT_obs)
     hist_temp_mnh = np.empty_like(hist2D_LT_mnh)
     for i in range(24):
-        hist_temp[:,i]= (hist2D_LT_obs[:,i] * bin_centers) / np.sum(hist2D_LT_obs [:,i])
+        if llobs : hist_temp[:,i]= (hist2D_LT_obs[:,i] * bin_centers) / np.sum(hist2D_LT_obs [:,i])
         hist_temp_mnh[:,i]= ( hist2D_LT_mnh[:,i] * bin_centers) / np.sum( hist2D_LT_mnh[:,i])
 
-    avr_obs = np.sum(hist_temp, axis = 0)
+    if llobs : avr_obs = np.sum(hist_temp, axis = 0)
     avr_mnh = np.sum(hist_temp_mnh, axis = 0)
 
     fig1 = plt.figure()
     ax1  = fig1.add_subplot(1, 1, 1)
-    ax1.plot(range(24),avr_obs, label='MSG OBS')
+    if llobs : ax1.plot(range(24),avr_obs, label='MSG OBS')
     ax1.plot(range(24),avr_mnh, label='Meso-NH')
     ax1.set_ylabel('Domain-average Brightness Temperature')
     ax1.set_xlabel('Local Time (hour)')
@@ -161,13 +164,19 @@ daterange   = [str(x).zfill(2) for x in range(dstart,dend+1)]
 daterangem1 = [str(x).zfill(2) for x in range(dstart-1,dend)]
 
 # get the meso-NH and MSG data
-BT108_all_obs = get_BT108_file(0, daterange, daterangem1, range(24)) # from 00UTC to 23UTC each day        
-BT108_all_mnh = get_BT108_file(1, daterange, daterangem1, range(24))        
+
+if lobs:
+    BT108_all_obs = get_BT108_file(0, daterange, daterangem1, range(24)) # from 00UTC to 23UTC each day
+
+BT108_all_mnh = get_BT108_file(1, daterange, daterangem1, range(24))
 
 # replace 999. in mnh files by NaN
 BT108_all_mnh[ BT108_all_mnh > 998. ]= np.NaN
-
-legend_list=('OBS03-11','MNH03-11') # legends for 1D - histograms
+print(BT108_all_mnh.shape)
+if lobs:
+    legend_list=('OBS03-11','MNH03-11') # legends for 1D - histograms
+else:
+    legend_list=('MNH03-11')
 # ranges of temperature for histograms, keep the same minimum for all
 hrange0=(182,            328)
 hrange1=(np.min(hrange0),260)
@@ -177,45 +186,53 @@ for hrange in [ hrange0, hrange1, hrange2 ]:
 
     BTmax=str(np.max(hrange))
     # create the 1D-histograms plots
-    create_hist1D_plot((BT108_all_obs, BT108_all_mnh), legend_list, hrange0,
+    if lobs:
+        create_hist1D_plot((BT108_all_obs, BT108_all_mnh), legend_list, hrange0,
                        'BT108_03-11_distribution', out_dir, xlabel='10.8 microns Brightness temperature (K)',
                        title='BT distribution (BT < ' + BTmax + ' K)')
+        # -------- create 2D histograms BT - local Time  ------- --------------------------------------- #
+        hist2D_LT_obs, bins_LT = create_2D_hist_LT(BT108_all_obs, hrange, lon)
+        plot_averages(hist2D_LT_obs, hist2D_LT_mnh, bins_LT, BTmax, out_path_fig=out_dir)
 
-    # -------- create 2D histograms BT - local Time  ------- --------------------------------------- #
-    hist2D_LT_obs, bins_LT = create_2D_hist_LT(BT108_all_obs, hrange,lon)
+    else:
+        create_hist1D_plot((BT108_all_mnh,), legend_list, hrange0,
+                       'BT108_03-11_distribution', out_dir, xlabel='10.8 microns Brightness temperature (K)',
+                       title='BT distribution (BT < ' + BTmax + ' K)')
+        # -------- create 2D histograms BT - local Time  ------- --------------------------------------- #
+
     hist2D_LT_mnh, bins_LT = create_2D_hist_LT(BT108_all_mnh, hrange,lon)
 
-    plot_averages(hist2D_LT_obs, hist2D_LT_mnh, bins_LT, BTmax, out_path_fig = out_dir)
+    plot_averages(hist2D_LT_mnh, hist2D_LT_mnh, bins_LT, BTmax, out_path_fig = out_dir, llobs = lobs)
 
 
 
     # TODO also plot individual histograms per time (?)
-
-    plot_2D_colormap(range(24), bins_LT, hist2D_LT_obs,
+    if lobs_2D:
+        plot_2D_colormap(range(24), bins_LT, hist2D_LT_obs,
                     out_name='2D_hist_dirnal_MSG_BT108_LocalTime_'+ BTmax, out_path_fig=out_dir,
-                    cnorm=LogNorm(vmin=np.min(hist2D_LT_obs[np.nonzero(hist2D_LT_obs)]),
-                                  vmax=np.max(hist2D_LT_obs)),
+                    cnorm=LogNorm(vmin=np.min(hist2D_LT_mnh[np.nonzero(hist2D_LT_mnh)]),
+                                  vmax=np.max(hist2D_LT_mnh)),
                     title='MSG BT 10.8 microns distribution (BT < ' + BTmax + ' K)', xlabel='Local Time (hour)',
                     ylabel='Brightness temperature (K)')
-
-    plot_2D_colormap(range(24), bins_LT, hist2D_LT_mnh,
-                 cnorm=LogNorm(vmin=np.min(hist2D_LT_obs[np.nonzero(hist2D_LT_obs)]),
-                                  vmax=np.max(hist2D_LT_obs)),
-                    out_name='2D_hist_dirnal_MNH_BT108_LocalTime_'+ BTmax, out_path_fig=out_dir,
-                    title='Meso-NH BT 10.8 microns distribution (BT < ' + BTmax + ' K)', xlabel='Local Time (hour)',
-                    ylabel='Brightness temperature (K)')
-
-    plot_2D_colormap(range(24), bins_LT, hist2D_LT_obs/np.sum(hist2D_LT_obs),
-                    cnorm=LogNorm(vmin=np.min(hist2D_LT_obs[np.nonzero(hist2D_LT_obs)])/np.sum(hist2D_LT_obs),
-                                  vmax=np.max(hist2D_LT_obs)/np.sum(hist2D_LT_obs)),
+        plot_2D_colormap(range(24), bins_LT, hist2D_LT_obs/np.sum(hist2D_LT_obs),
+                    cnorm=LogNorm(vmin=np.min(hist2D_LT_mnh[np.nonzero(hist2D_LT_mnh)])/np.sum(hist2D_LT_mnh),
+                                  vmax=np.max(hist2D_LT_mnh)/np.sum(hist2D_LT_mnh)),
                     out_name='2D_hist_dirnal_MSG_BT108_LocalTime_norm_'+ BTmax, out_path_fig=out_dir,
                     title='MSG BT 10.8 microns normalised distribution (BT < ' + BTmax + ' K)', xlabel='Local Time (hour)',
                     ylabel='Brightness temperature (K)')
 
+
+    plot_2D_colormap(range(24), bins_LT, hist2D_LT_mnh,
+                 cnorm=LogNorm(vmin=np.min(hist2D_LT_mnh[np.nonzero(hist2D_LT_mnh)]),
+                                  vmax=np.max(hist2D_LT_mnh)),
+                    out_name='2D_hist_dirnal_MNH_BT108_LocalTime_'+ BTmax, out_path_fig=out_dir,
+                    title='Meso-NH BT 10.8 microns distribution (BT < ' + BTmax + ' K)', xlabel='Local Time (hour)',
+                    ylabel='Brightness temperature (K)')
+
     plot_2D_colormap(range(24), bins_LT, hist2D_LT_mnh/np.sum(hist2D_LT_mnh),
                     out_name='2D_hist_dirnal_MNH_BT108_LocalTime_norm_'+ BTmax, out_path_fig=out_dir ,
-                    cnorm=LogNorm(vmin=np.min(hist2D_LT_obs[np.nonzero(hist2D_LT_obs)]) / np.sum(hist2D_LT_obs),
-                                  vmax=np.max(hist2D_LT_obs) / np.sum(hist2D_LT_obs)),
+                    cnorm=LogNorm(vmin=np.min(hist2D_LT_mnh[np.nonzero(hist2D_LT_mnh)]) / np.sum(hist2D_LT_mnh),
+                                  vmax=np.max(hist2D_LT_mnh) / np.sum(hist2D_LT_mnh)),
                     title='Meso-NH BT 10.8 microns normalised distribution (BT < ' + BTmax + ' K)', xlabel='Local Time (hour)',
                     ylabel='Brightness temperature (K)')
 
