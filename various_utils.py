@@ -593,7 +593,7 @@ def netcdf2geo_map(infile,indir,varname, outdir, outftype = 'ps',
 
     if vardim <= 3:
         plt.title(varname+' '+infile[:-3])
-        nom_fig=varname+infile[:-3] + log_tag
+        nom_fig=varname+'_'+infile[:-3] + log_tag
     elif not lsum:
         plt.title(varname+' l '+str(lev)+ ' ( ~'+ str(int(round(alt[lev]))) +'m ) '+infile[:-3])
         nom_fig=varname+'_'+infile[:-3]+'_lev'+str(lev) + log_tag
@@ -612,7 +612,10 @@ def netcdf2geo_map(infile,indir,varname, outdir, outftype = 'ps',
     if ladd_arrow_wind:
         m.quiver(x[0::10,0::10],y[0::10,0::10], UU[0::10,0::10], VV[0::10,0::10])
 
-    plt.savefig(outdir+nom_fig+'.'+outftype,format=outftype, bbox_inches = 'tight',
+    if not os.path.exists(outdir):
+        os.makedirs(outdir)
+
+    plt.savefig(outdir+'/'+nom_fig+'.'+outftype,format=outftype, bbox_inches = 'tight',
     pad_inches = 0)
     plt.close()
 
