@@ -132,7 +132,7 @@ def create_hist1D_plot(array_tuple, legend_tuple, hrange,
 def plot_2D_colormap(x, y, array2D,
                 out_name, cnorm, out_path_fig, out_type='pdf',
                 lyinvert=True, cmap='gist_ncar',
-                title='', xlabel='', ylabel=''):
+                title='', xlabel='', ylabel='', ymax=[], ymin=[]):
     # function to plot 2dimensional histograms as colormap
     # NB: can also be used to plot any 2-D colormap, no matter the input
     # array2D dimension must be consistent with x and y
@@ -147,6 +147,9 @@ def plot_2D_colormap(x, y, array2D,
     im = ax1.pcolor(x, y, array2D, cmap=cmap, norm=cnorm)
     if lyinvert:
         ax1.invert_yaxis()
+    if ymax!=[] and ymin!=[]:
+        ax1.set_ylim([ymin,ymax])
+
     fig1.colorbar(im,ax=ax1)
     ax1.set_xlabel(xlabel)
     ax1.set_title(title)
@@ -221,7 +224,8 @@ def get_indices_coords(lon,lat,loc_lat,loc_lon, inres,lclosest):
 
 
 def get_profile_mnh(infile, indir, varname, inres, loc_lat, loc_lon,
-                    nan_val=999., inunits=[], lclosest=False):
+                    nan_val=999., inunits=[], lclosest=False, alt_file=[]):
+    ### !!!! THERE WAS A MISTAKE : ALL THE PLOTS MADE  BEFORE 4 JULY 2019 were WRONG (indices were swaped)
     ''' function to get the average profile from the nearest model gridcolumns
      the return array is the average of all the model gridcolumn that are less than inres km away from (loc_lat,loc_lon)
      infile : input file name
@@ -233,7 +237,8 @@ def get_profile_mnh(infile, indir, varname, inres, loc_lat, loc_lon,
      nan_val: value of NaNs in input file
      inunits: units can be specified here, otherwise it will be read in netcdf file and if absent "unk" will be used
      lclosest : if true returns only the profile closest to the specified location (rather than the average of the closest profiles)
-     '''
+     alt_file : name of the file containing the altitudes AMSL
+    '''
 
     ncfile1 = Dataset(indir + infile, 'r')
     try:
@@ -259,13 +264,16 @@ def get_profile_mnh(infile, indir, varname, inres, loc_lat, loc_lon,
     else:
         varunits = inunits
 
-    if vardim == 4:
+    if alt_file != []:
+        alt_nc = Dataset(alt_file,'r')
+        alt=alt_nc.variables['ALT'][:,ilat,ilon] ## double check order
+    elif vardim == 4:
         # alt=ncfile1.variables['ALT'][lev,:,:]
         alt = ncfile1.variables['level'][:]
         # NB: not much sense here as altitude is a scalar - TODO put instead the actual altitude AMSL (rather than the level => use dia files)
-        altmin = np.nanmin(alt)
-        altmax = np.nanmax(alt)
-        altavg = np.nanmean(alt)
+        #altmin = np.nanmin(alt)
+        #altmax = np.nanmax(alt)
+        #altavg = np.nanmean(alt)
 
     else:
 
@@ -275,16 +283,16 @@ def get_profile_mnh(infile, indir, varname, inres, loc_lat, loc_lon,
         var[np.where(var == nan_val)] = np.nan  # or float('nan')
 
     if not lclosest:
-        var_loc = [var[0, :, i, j] for i in ilon for j in ilat]
+        var_loc = [var[0, :, i, j] for i in ilat for j in ilon]
         var_avg = np.nanmean(var_loc, axis=0)
     else:
-        var_avg = var[0, :, ilon, ilat]
+        var_avg = var[0, :, ilat,ilon]
 
-    return var_avg, alt, varunits, time,ilon,ilat
-
+    return var_avg, alt, varunits, time,ilon,ilat, lon[ilat,ilon], lat[ilat,ilon]
 
 def get_point_mnh(infile, indir, varname, inres, loc_lat, loc_lon,
                     nan_val=999., inunits=[], lclosest=False):
+    # order ilat,ilon corrected on 5th July 2019
     ''' function to get the value of a vriable at a given lon-lat point by averaging MNH neighbooring gridpoints
      the return array is the average of all the model gridcolumn that are less than inres km away from (loc_lat,loc_lon)
      infile : input file name
@@ -324,10 +332,10 @@ def get_point_mnh(infile, indir, varname, inres, loc_lat, loc_lon,
 
     var[np.where(var == nan_val)] = np.nan  # or float('nan')
     if not lclosest:
-        var_loc = [var[0, i, j] for i in ilon for j in ilat]
+        var_loc = [var[0, i, j] for i in ilat for j in ilon]
         var_avg = np.nanmean(var_loc, axis=0)
     else:
-        var_avg = var[0, ilon, ilat]
+        var_avg = var[0, ilat, ilon]
 
     return var_avg,varunits, time, ilon, ilat
 
@@ -381,11 +389,12 @@ def plot_profile_mnh(infile, indir, allnames, inres, loc_lat, loc_lon, outdir, o
         fig1.savefig(outdir + '/' + outname + '.' + outftype)
         plt.close(fig1)
 
+
 def netcdf2geo_map(infile,indir,varname, outdir, outftype = 'ps',
                    colmap='rainbow',colorlev = 10, cmin = [], cmax=[],
                    cticks=[], proj='merc', nan_val=999.,
                    dlatlabel = 4., dlonlabel = 4. , lev = 21, alt_max = 999.e3, lsum = False, islog=False, coordfile = [],
-                   ladd_arrow_wind=False, windfile=[], LSwind=False, cmapextend = 'both'):
+                   ladd_arrow_wind=False, windfile=[], LSwind=False, cmapextend = 'both', extravar_contour=[], cmap_extra='Greys'):
     ''' plot geographical maps of a given quantity (2D or 3D in which case a level should be specified
         ifile:    name of the input netcdf file
         idir:     input directory full path
@@ -611,6 +620,9 @@ def netcdf2geo_map(infile,indir,varname, outdir, outftype = 'ps',
 
     if ladd_arrow_wind:
         m.quiver(x[0::10,0::10],y[0::10,0::10], UU[0::10,0::10], VV[0::10,0::10])
+
+    if extravar_contour != []:
+        m.contour(x,y,extravar_contour, cmap=get_cmap(colmap) )
 
     if not os.path.exists(outdir):
         os.makedirs(outdir)
