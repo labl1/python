@@ -276,7 +276,6 @@ def get_profile_mnh(infile, indir, varname, inres, loc_lat, loc_lon,
         #altavg = np.nanmean(alt)
 
     else:
-
         raise ValueError('vardim is %i instead of 4 for variable %s in file %s ' % (vardim, varname, infile))
 
     if ( np.size(np.where(var == nan_val)) > 0 ):
