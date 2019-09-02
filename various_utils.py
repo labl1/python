@@ -220,17 +220,17 @@ def get_indices_coords(lon,lat,loc_lat,loc_lon, inres,lclosest):
         ilon = ilon[ii]
         ilat = ilat[jj]
 
-    return ilon,ilat
+    return ilon,ilat#,llon,llat
 
 
-def get_profile_mnh(infile, indir, varname, inres, loc_lat, loc_lon,
+def get_profile_mnh(infile, indir, varnamelist, inres, loc_lat, loc_lon,
                     nan_val=999., inunits=[], lclosest=False, alt_file=[]):
     ### !!!! THERE WAS A MISTAKE : ALL THE PLOTS MADE  BEFORE 4 JULY 2019 were WRONG (indices were swaped)
     ''' function to get the average profile from the nearest model gridcolumns
      the return array is the average of all the model gridcolumn that are less than inres km away from (loc_lat,loc_lon)
      infile : input file name
      indir  : input directory full path
-     varname: name of tyhe variable to retrieve
+     varnamelist: name of the variable to retrieve or the list of variable names (e.g. ['var1', 'var2'] )
      inres  : resolution of the input data (km)
      loc_lat: latitude of desired location for the profiles
      loc_lon: longitude of ...
@@ -238,7 +238,13 @@ def get_profile_mnh(infile, indir, varname, inres, loc_lat, loc_lon,
      inunits: units can be specified here, otherwise it will be read in netcdf file and if absent "unk" will be used
      lclosest : if true returns only the profile closest to the specified location (rather than the average of the closest profiles)
      alt_file : name of the file containing the altitudes AMSL
+     nbvar = number of variables
     '''
+
+
+    if isinstance(varnamelist,str):
+        varnamelist=[varnamelist]
+
 
     ncfile1 = Dataset(indir + infile, 'r')
     try:
@@ -248,46 +254,57 @@ def get_profile_mnh(infile, indir, varname, inres, loc_lat, loc_lon,
         lat = ncfile1.variables['latitude'][:, :]
         lon = ncfile1.variables['longitude'][:, :]
     time = ncfile1.variables['time']
-    var = ncfile1.variables[varname][:, :,:,:]
 
     ilon,ilat = get_indices_coords(lon,lat,loc_lat,loc_lon, inres, lclosest)
+    varunits_all = []
+    nbvar = len(varnamelist)
+    nvar=0
 
+    for varname in varnamelist:
+        if nvar == 0 :
+            nblev= len(ncfile1.variables[varname][0, :, 0, 0])
+            var_avg_all = np.zeros([nbvar,nblev])
 
-    vardim = len(ncfile1.variables[varname].shape)
-    if inunits == []:
-        try:
-            varunits = ncfile1.variables[varname].units
-        except:
-            varunits = 'unk'
-            warnings.warn('variable %s units are not specified in the netcdf'
-                 'file neither in the function call - set to unk' % (varname))
-    else:
-        varunits = inunits
+        var = ncfile1.variables[varname][:, :, :, :]
 
-    if alt_file != []:
-        alt_nc = Dataset(alt_file,'r')
-        alt=alt_nc.variables['ALT'][:,ilat,ilon] ## double check order
-    elif vardim == 4:
-        # alt=ncfile1.variables['ALT'][lev,:,:]
-        alt = ncfile1.variables['level'][:]
-        # NB: not much sense here as altitude is a scalar - TODO put instead the actual altitude AMSL (rather than the level => use dia files)
-        #altmin = np.nanmin(alt)
-        #altmax = np.nanmax(alt)
-        #altavg = np.nanmean(alt)
+        vardim = len(ncfile1.variables[varname].shape)
+        if inunits == []:
+            try:
+                varunits = ncfile1.variables[varname].units
+            except:
+                varunits = 'unk'
+                warnings.warn('variable %s units are not specified in the netcdf'
+                     'file neither in the function call - set to unk' % (varname))
+        else:
+            varunits = inunits
 
-    else:
-        raise ValueError('vardim is %i instead of 4 for variable %s in file %s ' % (vardim, varname, infile))
+        if alt_file != []:
+            alt_nc = Dataset(alt_file,'r')
+            alt=alt_nc.variables['ALT'][:,ilat,ilon] ## double check order
+        elif vardim == 4:
+            # alt=ncfile1.variables['ALT'][lev,:,:]
+            alt = ncfile1.variables['level'][:]
+            # NB: not much sense here as altitude is a scalar - TODO put instead the actual altitude AMSL (rather than the level => use dia files)
+            #altmin = np.nanmin(alt)
+            #altmax = np.nanmax(alt)
+            #altavg = np.nanmean(alt)
+        else:
+            raise ValueError('vardim is %i instead of 4 for variable %s in file %s ' % (vardim, varname, infile))
 
-    if ( np.size(np.where(var == nan_val)) > 0 ):
-        var[np.where(var == nan_val)] = np.nan  # or float('nan')
+        if ( np.size(np.where(var == nan_val)) > 0 ):
+            var[np.where(var == nan_val)] = np.nan  # or float('nan')
 
-    if not lclosest:
-        var_loc = [var[0, :, i, j] for i in ilat for j in ilon]
-        var_avg = np.nanmean(var_loc, axis=0)
-    else:
-        var_avg = var[0, :, ilat,ilon]
+        if not lclosest:
+            var_loc = [var[0, :, i, j] for i in ilat for j in ilon]
+            var_avg = np.nanmean(var_loc, axis=0)
+        else:
+            var_avg = var[0, :, ilat,ilon]
 
-    return var_avg, alt, varunits, time,ilon,ilat, lon[ilat,ilon], lat[ilat,ilon]
+        varunits_all.append(varunits)
+        var_avg_all[nvar,:]=var_avg
+        nvar+=1
+
+    return var_avg_all, alt, varunits_all, time,ilon,ilat, lon[ilat,ilon], lat[ilat,ilon]
 
 def get_point_mnh(infile, indir, varname, inres, loc_lat, loc_lon,
                     nan_val=999., inunits=[], lclosest=False):
@@ -629,4 +646,25 @@ def netcdf2geo_map(infile,indir,varname, outdir, outftype = 'ps',
     plt.savefig(outdir+'/'+nom_fig+'.'+outftype,format=outftype, bbox_inches = 'tight',
     pad_inches = 0)
     plt.close()
+
+### a TESTER / FINIR (21 Aout 2019)
+def tracer_vert_int(tracer_file,tracer_name,mnh_diag_file):
+    svt_nc=Dataset(tracer_file,'r')
+    svt=svt_nc.variables[tracer_name][0, 1:-1, 1:-1, 1:-1]
+
+    dia_nc=Dataset(mnh_diag_file,'r')
+    try:
+        rho=dia_nc.variables['RHOREFZ'][0, 1:-1, 1:-1, 1:-1]
+    except:
+        temp = dia_nc.variables['TEMP'][0, 1:-1, 1:-1, 1:-1] + 273.15
+        P = dia_nc.variables['PRESS'][0, 1:-1, 1:-1, 1:-1] * 100.
+        Ra = 287.058
+        rho = P / (temp * Ra)
+
+    dalt = dia_nc.variables['ALT'][0, 2:-1, 1:-1, 1:-1] - dia_nc.variables['ALT'][0, 1:-2, 1:-1, 1:-1]
+
+    svt_i = rho * dalt * svt
+
+    svt_int = np.sum(svt_i,axis=0)
+    return svt_int
 
