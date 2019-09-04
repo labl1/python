@@ -668,4 +668,3 @@ def tracer_vert_int(tracer_file,tracer_name,mnh_diag_file):
     svt_int = np.sum(svt_i,axis=0)
     return svt_int
 
-

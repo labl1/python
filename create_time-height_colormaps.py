@@ -15,7 +15,7 @@ filelist = ['BG54b.1.SEP02.0'+str(i).zfill(2)+'dia_all_selected.nc' for i in ran
 nblev = 67 # number of actual vertiocal levels (excluding padding levels)
 nbprofiles = len(filelist)
 
-outname = varname + '_BG54b.1.SEP01-14'
+outname = varname '_' + site + '_BG54b.1.SEP01-14'
 outftype = 'ps'
 
 loc_lat_WBA = -22.979722
