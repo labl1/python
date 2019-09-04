@@ -40,26 +40,6 @@ def create_alongF20_nc(outfname,variables,t_lidar,alt,time_mnh_all,alt_lidar,ilo
         #standard CF names cloud_ice_mixing_ratio and cloud_liquid_water_mixing_ratio
 
 
-    '''
-    if len(varnamelist) == 1:
-        var1 = out_data.createVariable('tracer', np.float32, ('time','altitude'))
-        var1.long_name = 'MNH passive tracer'
-    elif len(varname_list) == 6:
-        var1 = out_data.createVariable('tracer1', np.float32, ('time','altitude'))
-        var1.long_name = 'MNH passive tracer'
-        var1.mnh_name  = varname[0]
-        var2 = out_data.createVariable('tracer2', np.float32, ('time','altitude'))
-        var2.long_name = 'MNH passive tracer'
-        var2.mnh_name  = varname[1]
-
-        var3 = out_data.createVariable('tracer3', np.float32, ('time','altitude'))
-        var3.long_name = 'MNH passive tracer'
-        var3.mnh_name  = varname[2]
-
-        var4 = out_data.createVariable('tracer4', np.float32, ('time','altitude'))
-        var4.long_name = 'MNH passive tracer'
-        var4.mnh_name  = varname[3]
-    '''
 
 
     hour_lidar = out_data.createVariable('hour_lidar', np.float32, ('time',))
@@ -150,12 +130,13 @@ nb_vert_lev = 65
 
 out_freq = 3 # output frequency in hours
 
-nbtracers=4
+nbtracers=1 # nbre of passive tracers
 
-other_var=["RCT","RIT"] # non-tracer variables to plot as extra contours; e.g. cloud variables
+other_var=["RCT","RIT", "DSTM33T","DSTM32T","DSTM31T"] # non-tracer variables to plot as extra contours; e.g. cloud variables
 
 long_names = ["MNH passive tracer 1: all BC sources - mask", "MNH passive tracer 2: Small BC sources centre-South - mask ", "MNH passive tracer 3: BC sources South-East - mask " , "MNH passive tracer 4: all BC sources - float ",
-              'MNH Cloud mixing ratio', 'MNH Ice mixing ratio']
+              'MNH Cloud mixing ratio', 'MNH Ice mixing ratio',
+              'Dust mixing ratio mode 3',  'Dust mixing ratio mode 2','Dust mixing ratio mode 1']
 
 # day in september 2017
 dd = '05'
@@ -214,7 +195,7 @@ for tt in t_unique:
     if simu_name!='XA54b' and simu_name!='XA540':
         mnh_file = mnh_file_nn + '.1.SEP' + dd + '.0' + str(tt).zfill(2) +'_selectedVar.nc' #'BG54b.1.SEP' + dd + '.0 '+  tt.zfill(2) + '.nc'
     else:
-        mnh_file = mnh_file_nn + '.1.SEP' + dd + '.0' + str(tt).zfill(2) +'_SVT_CLD.nc'
+        mnh_file = mnh_file_nn + '.1.SEP' + dd + '.0' + str(tt).zfill(2) +'_SVT_CLD_DST.nc'
     mnh_simulation_info = mnh_simulation_info + mnh_file + ' '
 
     for i in np.where(t_int_h == tt)[0]: # select the indices corresponding to a given hour (so that a different MNH file is used for each of them)
