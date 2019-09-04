@@ -23,7 +23,7 @@ filename=args.filename
  '''
 def plot_2D_along_LNG(x, y, array2D, ice, cloud,
                 out_name, nnorm, out_path_fig, out_type='pdf',
-                lyinvert=True, ccmap='gist_ncar', dust=[],
+                lyinvert=True, ccmap='gist_ncar', dust=[],alt_LNG=[],tt_LNG=[],
                 title='', xlabel='', ylabel='', ymax=[], ymin=[], lpltLNG=False, LNGarray2D=[]):
     fig1 = plt.figure()
     if not lpltLNG:
@@ -70,7 +70,13 @@ def plot_2D_along_LNG(x, y, array2D, ice, cloud,
     ax1.set_ylabel(ylabel)
     if lpltLNG:
         ax2 = fig1.add_subplot(2, 1, 2)
-        im2 = ax2.pcolor(x, y, LNGarray2D, cmap=ccmap, norm=nnorm)
+        normLNG = mpl.colors.Normalize(vmin=0., vmax=3.)
+
+        im2 = ax2.pcolor(tt_LNG, alt_LNG, LNGarray2D, cmap=ccmap, norm=normLNG)
+        print(np.max(LNGarray2D))
+        fig1.colorbar(im2, ax=ax2)
+        ax2.set_ylabel(ylabel)
+        ax1.set_xlabel(xlabel)
 
     fig1.savefig(out_path_fig + '/' + out_name + '.' + out_type)
     plt.close(fig1)
@@ -93,6 +99,8 @@ tracer_all[np.where(tracer_all <= 0)] = np.NaN
 rct = ncfile.variables['RCT'][:,:]
 rit = ncfile.variables['RIT'][:,:]
 
+alt_LNG = ncfile.variables['altitude_LNG'][:]
+
 DSTM33T = ncfile.variables['DSTM33T'][:,:]
 DSTM32T = ncfile.variables['DSTM32T'][:,:]
 DSTM31T = ncfile.variables['DSTM31T'][:,:]
@@ -101,8 +109,10 @@ DSTMtot = DSTM33T + DSTM32T + DSTM31T
 
 #"RCT","RIT"] #,"DSTM33T","DSTM32T","DSTM31T"]
 time_mnh_all_2D = np.transpose(np.array([time_mnh_all for x in range(nb_vert_lev)]))
+alt_LNG_2D = np.transpose(np.array([time_mnh_all for y in range(len(alt_LNG))]))
+time_LNG_all_2D = np.transpose(np.array([time_mnh_all for x in range(len(alt_LNG))]))
 
-plot_2D_along_LNG(time_mnh_all_2D, alt, tracer_all, rit,rct, dust=DSTMtot, lpltLNG=True, LNGarray2D=ABC_1064nm,
+plot_2D_along_LNG(time_mnh_all_2D, alt, tracer_all, rit,rct, dust=DSTMtot, lpltLNG=True, LNGarray2D=ABC_1064nm, alt_LNG=alt_LNG_2D, tt_LNG = time_LNG_all_2D,
                 out_name='passive_tracer_MNH'+exp+'vol6', nnorm=norm, out_path_fig='/home/labl/Bureau/', out_type='png',
                 lyinvert=False, ccmap='gist_heat',
                 title=exp+' passive tracer + rit (blue) and rct (black)', xlabel='Time (days in year 2017)', ylabel='Altitude (km)',ymax = 10., ymin=0.)
