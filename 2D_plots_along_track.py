@@ -70,13 +70,14 @@ def plot_2D_along_LNG(x, y, array2D, ice, cloud,
     ax1.set_ylabel(ylabel)
     if lpltLNG:
         ax2 = fig1.add_subplot(2, 1, 2)
-        normLNG = mpl.colors.Normalize(vmin=0., vmax=3.)
+        normLNG = mpl.colors.Normalize(vmin=0., vmax=1.5)
 
         im2 = ax2.pcolor(tt_LNG, alt_LNG, LNGarray2D, cmap=ccmap, norm=normLNG)
-        print(np.max(LNGarray2D))
+        ax2.set_ylim([ymin, ymax])
         fig1.colorbar(im2, ax=ax2)
         ax2.set_ylabel(ylabel)
-        ax1.set_xlabel(xlabel)
+        ax2.set_xlabel(xlabel)
+
 
     fig1.savefig(out_path_fig + '/' + out_name + '.' + out_type)
     plt.close(fig1)
@@ -109,8 +110,8 @@ DSTMtot = DSTM33T + DSTM32T + DSTM31T
 
 #"RCT","RIT"] #,"DSTM33T","DSTM32T","DSTM31T"]
 time_mnh_all_2D = np.transpose(np.array([time_mnh_all for x in range(nb_vert_lev)]))
-alt_LNG_2D = np.transpose(np.array([time_mnh_all for y in range(len(alt_LNG))]))
-time_LNG_all_2D = np.transpose(np.array([time_mnh_all for x in range(len(alt_LNG))]))
+alt_LNG_2D = np.array([alt_LNG for y in range(len(time_mnh_all))])
+time_LNG_all_2D = np.transpose(np.array([time_mnh_all for xx in range(len(alt_LNG))]))
 
 plot_2D_along_LNG(time_mnh_all_2D, alt, tracer_all, rit,rct, dust=DSTMtot, lpltLNG=True, LNGarray2D=ABC_1064nm, alt_LNG=alt_LNG_2D, tt_LNG = time_LNG_all_2D,
                 out_name='passive_tracer_MNH'+exp+'vol6', nnorm=norm, out_path_fig='/home/labl/Bureau/', out_type='png',
