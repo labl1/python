@@ -12,6 +12,10 @@ from matplotlib.cm import get_cmap as get_cmap
 from netCDF4 import Dataset
 from math import pi
 import warnings
+
+import cartopy.crs as ccrs
+import cartopy.feature as cft
+
 from math import sqrt
 import os
 
@@ -647,24 +651,87 @@ def netcdf2geo_map(infile,indir,varname, outdir, outftype = 'ps',
     pad_inches = 0)
     plt.close()
 
+
+def var2map(var1,lon1,lat1,  day, fig_title='',maplimits=[-18.,38.,-36.,10.],
+            out_path_fig='/home/labl/Bureau/', out_name='test', out_type='png'):
+    # maplimits = [lonmin, lonmax, latmin, latmax]
+    dlonlabel=10. # label latitude every 10 degrees
+    #minlon=-18.65
+    #maxlon=57.23
+
+    proj = ccrs.PlateCarree()
+    ax = plt.axes(projection=proj)
+
+
+    # plot  -- try cartopy
+    fig = plt.figure()
+    ax = plt.axes(projection=ccrs.PlateCarree())
+    gl = ax.gridlines(crs=ccrs.PlateCarree(), draw_labels=True,
+                  linewidth=0.6, color='gray', alpha=0.5, linestyle='--')
+    ax.add_feature(cft.BORDERS, linestyle='-', alpha=.5)
+
+
+
+    gl.ylabels_right = False
+    gl.xlabels_top   = False
+    '''
+    gl.xformatter = LONGITUDE_FORMATTER
+    gl.yformatter = LATITUDE_FORMATTER
+    gl.xlocator = mticker.FixedLocator(np.arange(round(maplimits[0]),round(maplimits[1]),dlonlabel))
+    '''
+
+    cp = plt.contourf(lon1, lat1, var1,
+                      transform=ccrs.PlateCarree(),
+                      cmap=get_cmap('gnuplot') )#,vmin=0., vmax=0.0035, levels= np.linspace(0, 0.0035, 11), alpha=0.8)
+    plt.colorbar()
+
+    # for some reason color keyword doesn't work
+    '''cp2 = plt.contourf(lon_flag, lat_flag, conv_flag[:, :, dday - stday], transform=ccrs.PlateCarree(),
+                       colors = 'w', levels = [1,24], alpha=0.35)#cmap=get_cmap('Greys'), levels=[1, 5, 10])
+    '''
+
+    ax.coastlines()
+    ax.add_feature(cft.LAKES, alpha=0.8)
+    ax.add_feature(cft.OCEAN, alpha=0.8)
+    ax.set_extent(maplimits, crs=ccrs.PlateCarree())
+    plt.title(fig_title)
+    plt.xlabel('Longitude')
+    plt.ylabel('Latitude')
+    fig.savefig(out_path_fig + '/' + out_name +'_'+day+'SEP.' + out_type)
+    plt.close(fig)
+
+
 ### a TESTER / FINIR (21 Aout 2019)
-def tracer_vert_int(tracer_file,tracer_name,mnh_diag_file):
+def tracer_vert_int(tracer_file,tracer_name,day):
     svt_nc=Dataset(tracer_file,'r')
     svt=svt_nc.variables[tracer_name][0, 1:-1, 1:-1, 1:-1]
-
-    dia_nc=Dataset(mnh_diag_file,'r')
+    #lon = svt_nc.variables['LON'][0, 1:-1, 1:-1, 1:-1] # LON
+    #lat = svt_nc.variables['LAT'][0, 1:-1, 1:-1, 1:-1] # LAT
+    lon=svt_nc.variables['longitude'][1:-1, 1:-1] # LON
+    lat = svt_nc.variables['longitude'][1:-1, 1:-1] # LON
     try:
-        rho=dia_nc.variables['RHOREFZ'][0, 1:-1, 1:-1, 1:-1]
+        rho=svt_nc.variables['RHOREFZ'][0, 1:-1, 1:-1, 1:-1]
     except:
-        temp = dia_nc.variables['TEMP'][0, 1:-1, 1:-1, 1:-1] + 273.15
-        P = dia_nc.variables['PRESS'][0, 1:-1, 1:-1, 1:-1] * 100.
+        temp = svt_nc.variables['TEMP'][0, 1:-1, 1:-1, 1:-1] + 273.15
+        P = svt_nc.variables['PRESS'][0, 1:-1, 1:-1, 1:-1] * 100.
         Ra = 287.058
         rho = P / (temp * Ra)
 
-    dalt = dia_nc.variables['ALT'][0, 2:-1, 1:-1, 1:-1] - dia_nc.variables['ALT'][0, 1:-2, 1:-1, 1:-1]
+    dalt = svt_nc.variables['ALT'][0, 2:-1, 1:-1, 1:-1] - svt_nc.variables['ALT'][0, 1:-2, 1:-1, 1:-1]
 
     svt_i = rho * dalt * svt
 
     svt_int = np.sum(svt_i,axis=0)
+
+    # plot tracer
+    var2map(svt_int, lon, lat, day, fig_title='', maplimits=[-18., 38., -36., 10.],
+            out_path_fig='/home/labl/Bureau/', out_name=test, out_type='png')
+
+    '''plot_2D_colormap(svt_int, alt, tracer_all,
+                out_name='passive_tracer_MNH'+exp+'vol6', cnorm=norm, out_path_fig='/home/labl/Bureau/', out_type='png',
+                lyinvert=False, cmap='jet',
+                title=exp+' passive tracer', xlabel='Time (days in year 2017)', ylabel='Altitude (km)',ymax = 10., ymin=0.)'''
+
+
     return svt_int
 
