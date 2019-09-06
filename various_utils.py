@@ -682,8 +682,8 @@ def var2map(var1,lon1,lat1,  day, fig_title='',maplimits=[-18.,38.,-36.,10.],
 
     cp = plt.contourf(lon1, lat1, var1,
                       transform=ccrs.PlateCarree(),
-                      cmap=get_cmap('gnuplot') )#,vmin=0., vmax=0.0035, levels= np.linspace(0, 0.0035, 11), alpha=0.8)
-    plt.colorbar()
+                      cmap=get_cmap('gnuplot') ,vmin=10., vmax=3210, levels= np.linspace(10, 3210, 21), alpha=0.92)
+    plt.colorbar(cp)
 
     # for some reason color keyword doesn't work
     '''cp2 = plt.contourf(lon_flag, lat_flag, conv_flag[:, :, dday - stday], transform=ccrs.PlateCarree(),
@@ -702,30 +702,33 @@ def var2map(var1,lon1,lat1,  day, fig_title='',maplimits=[-18.,38.,-36.,10.],
 
 
 ### a TESTER / FINIR (21 Aout 2019)
-def tracer_vert_int(tracer_file,tracer_name,day):
+def tracer_vert_int(tracer_file,tracer_name,day,alt_file):
     svt_nc=Dataset(tracer_file,'r')
     svt=svt_nc.variables[tracer_name][0, 1:-1, 1:-1, 1:-1]
     #lon = svt_nc.variables['LON'][0, 1:-1, 1:-1, 1:-1] # LON
     #lat = svt_nc.variables['LAT'][0, 1:-1, 1:-1, 1:-1] # LAT
     lon=svt_nc.variables['longitude'][1:-1, 1:-1] # LON
-    lat = svt_nc.variables['longitude'][1:-1, 1:-1] # LON
-    try:
-        rho=svt_nc.variables['RHOREFZ'][0, 1:-1, 1:-1, 1:-1]
-    except:
-        temp = svt_nc.variables['TEMP'][0, 1:-1, 1:-1, 1:-1] + 273.15
-        P = svt_nc.variables['PRESS'][0, 1:-1, 1:-1, 1:-1] * 100.
-        Ra = 287.058
-        rho = P / (temp * Ra)
-
-    dalt = svt_nc.variables['ALT'][0, 2:-1, 1:-1, 1:-1] - svt_nc.variables['ALT'][0, 1:-2, 1:-1, 1:-1]
-
+    lat = svt_nc.variables['latitude'][1:-1, 1:-1] # LON
+    #try:
+    #    rho=svt_nc.variables['RHOREFZ'][0, 1:-1, 1:-1, 1:-1]
+    #except:
+        #temp = svt_nc.variables['TEMP'][0, 1:-1, 1:-1, 1:-1] + 273.15
+    tht = svt_nc.variables['THT'][0, 1:-1, 1:-1, 1:-1]
+    P   = svt_nc.variables['PABST'][0, 1:-1, 1:-1, 1:-1]  # ou PRESS * 100.
+    Ra  = 287.058
+    rho = P / ( ( tht/(100000./P)**0.286 ) * Ra)
+    alt_nc = Dataset(alt_file, 'r')
+    dalt = alt_nc.variables['ALT'][2:, 1:-1, 1:-1] - alt_nc.variables['ALT'][ 1:-1, 1:-1, 1:-1]
     svt_i = rho * dalt * svt
 
     svt_int = np.sum(svt_i,axis=0)
+    threshold = 10.
+    svt_int[np.where(svt_int < threshold)] = np.NaN
+    print(np.shape(svt_int))
 
     # plot tracer
     var2map(svt_int, lon, lat, day, fig_title='', maplimits=[-18., 38., -36., 10.],
-            out_path_fig='/home/labl/Bureau/', out_name=test, out_type='png')
+            out_path_fig='/home/labl/Bureau/', out_name='test', out_type='png')
 
     '''plot_2D_colormap(svt_int, alt, tracer_all,
                 out_name='passive_tracer_MNH'+exp+'vol6', cnorm=norm, out_path_fig='/home/labl/Bureau/', out_type='png',
