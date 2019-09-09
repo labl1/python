@@ -19,7 +19,7 @@ def create_alongF20_nc(outfname,variables,t_lidar,alt,time_mnh_all,alt_lidar,ilo
     # formula_definition = "z(n,k,j,i)=s(k)*(height-orog(j,i))/height+orog(j,i)";
 
     out_data = Dataset(outfname, 'w', format='NETCDF4_CLASSIC')
-
+    
     # file Dimensions
     altitude = out_data.createDimension('altitude', nb_vert_lev)
     time     = out_data.createDimension('time', nb_pro_lidar)
@@ -116,21 +116,54 @@ def create_alongF20_nc(outfname,variables,t_lidar,alt,time_mnh_all,alt_lidar,ilo
     out_data.close()
 
 ## ************************** MAIN **************************************** ##
+import argparse
+import os.path
+from os import path
+
+
+parser = argparse.ArgumentParser()
+parser.add_argument("flightnumber", type=str, help="input filightnumber")
+
+args = parser.parse_args()
+
+volnb = args.flightnumber
 
 # Variables to edit
-infile = '/home/labl/Bureau/Lidars/LNG_DATA/ABC2_files/netcdf/LNG2_ABC_level1_20170905_Vol6.nc'
+#infile = '/home/labl/Bureau/Lidars/LNG_DATA/ABC2_files/netcdf/LNG2_ABC_level1_20170905_Vol6.nc'
+#volnb = '6'
 
-alt_MNH_file = '/home/labl/Bureau/TEST0_ALT_dia_file.nc'
+if (volnb == '6') or (volnb =='7'):
+    dd='05'
+elif (volnb == '8') or (volnb == '9'):
+    dd='06'
+elif ( volnb == '10' ):
+    dd='07' 
+elif ( volnb == '11') or (volnb == '12' ):
+    dd='08' 
+elif ( volnb == '13'): 
+    dd='09'
+elif ( volnb == '14')  or (volnb == '15' ):
+    dd='12'
+else:
+    print('There is no F20 flight number ' + volnb + ' flight number must be between 6 and 15')
+
+infile = '/mesonh/labl/LNG2/level1/LNG2_ABC_level1_201709'+dd+'_Vol'+volnb+'.nc'
+#infile = '/home/labl/Bureau/Lidars/LNG_DATA/ABC2_files/netcdf/LNG2_ABC_level1_20170905_Vol6.nc'
+
+if not path.exists(infile):
+    print("file "+infile+" does not exist")
+
+alt_MNH_file = '/mesonh/labl/TEST0/DIA/TEST0_ALT_dia_file.nc'
 
 simu_name = 'XA54b'
 
-outname = '/home/labl/Bureau/20170905_Vol6_MNH_'+simu_name+'_pTracer.nc' # output netcdf file with the MNH data
+outname = '//mesonh/labl/MNH_along_LNG_ncfiles/Vol'+volnb+'_MNH_'+simu_name+'_pTracer.nc' # output netcdf file with the MNH data
 
 nb_vert_lev = 65
 
 out_freq = 3 # output frequency in hours
 
-nbtracers=1 # nbre of passive tracers
+nbtracers=4 # nbre of passive tracers
 
 other_var=["RCT","RIT", "DSTM33T","DSTM32T","DSTM31T"] # non-tracer variables to plot as extra contours; e.g. cloud variables
 
@@ -138,16 +171,15 @@ long_names = ["MNH passive tracer 1: all BC sources - mask", "MNH passive tracer
               'MNH Cloud mixing ratio', 'MNH Ice mixing ratio',
               'Dust mixing ratio mode 3',  'Dust mixing ratio mode 2','Dust mixing ratio mode 1']
 
-# day in september 2017
-dd = '05'
+#dd = '05'
 inres = 12. # meso-NH simulation resolution
 
 mnh_simulation_info = 'Meso-NH 5.4.2 simulation '+ simu_name + ' at ' + str(inres) +  ' km resolution' \
                       'with: ' \
                       ' ni = 514 (x-direction)' \
                       ' nj = 452 (y-direction)' \
-                      ' level = 67 ' \
-                      ' and  lon0 = 10 °E ; lat0 = -15 °N' \
+                      ' level = 67   ' \
+                      ' and  lon0 = 10 E ; lat0 = -15 N' \
                       'Meso-NH files used :' \
                       ' '
 
@@ -193,12 +225,23 @@ for tt in t_unique:
     else:
         mnh_file_nn = simu_name
     if simu_name!='XA54b' and simu_name!='XA540':
-        mnh_file = mnh_file_nn + '.1.SEP' + dd + '.0' + str(tt).zfill(2) +'_selectedVar.nc' #'BG54b.1.SEP' + dd + '.0 '+  tt.zfill(2) + '.nc'
+        if tt!=0:
+            mnh_file = mnh_file_nn + '.1.SEP' + dd + '.0' + str(tt).zfill(2) +'_selectedVar.nc' #'BG54b.1.SEP' + dd + '.0 '+  tt.zfill(2) + '.nc'
+        else:
+            ddm1 = str(int(dd)-1).zfill(2)
+            ttm1=str(nb_out).zfill(2)
+            mnh_file = mnh_file_nn + '.1.SEP' + ddm1 + '.0' + str(ttm1).zfill(2) +'_selectedVar.nc'
     else:
-        mnh_file = mnh_file_nn + '.1.SEP' + dd + '.0' + str(tt).zfill(2) +'_SVT_CLD_DST.nc'
+        if tt!=0:
+            mnh_file = mnh_file_nn + '.1.SEP' + dd + '.0' + str(tt).zfill(2) +'.nc'  #'_SVT_CLD_DST.nc'
+        else:
+            ddm1 = str(int(dd)-1).zfill(2)
+            ttm1=str(nb_out).zfill(2)
+            mnh_file = mnh_file_nn + '.1.SEP' + ddm1 + '.0' + str(ttm1).zfill(2) +'.nc'  #'_SVT_CLD_DST.nc'
+
     mnh_simulation_info = mnh_simulation_info + mnh_file + ' '
 
-    for i in np.where(t_int_h == tt)[0]: # select the indices corresponding to a given hour (so that a different MNH file is used for each of them)
+    for i in np.where(t_int_h == tt)[0]: #
         # read MNH corresponding file
         mnh_dir = '/home/labl/Bureau/TEST0_12km_ncfiles/'
         if simu_name == 'TEST0':
@@ -208,14 +251,15 @@ for tt in t_unique:
         elif simu_name == 'BG54b':
             mnh_dir  = '/home/labl/Bureau/MNH_simulations/BG54b_12km/ncfiles/'
         else:
-            mnh_dir  = '/home/labl/Bureau/'
+            mnh_dir  = '/mesonh/chajp/WALVI/XA54b/' #'/home/labl/Bureau/'
 
         #ncMNH = Dataset(mnh_dir+mnh_file, 'r')
         #tracer = ncMNH.variables['SVT001']
         #mnh_lat = ncMNH.variables['latitude']
         #mnh_lon
 
-
+        if not path.exists(mnh_dir+mnh_file):
+            print(mnh_dir+mnh_file + " does not exists! -> Error")
         variables_all, alt1, varunits_all, time_mnh,indlon,indlat, lllon,lllat  = get_profile_mnh(mnh_file, mnh_dir, varname_list, inres, lat[i], lon[i],
                                                           nan_val=999., inunits=[], lclosest=True,alt_file=alt_MNH_file)
         alt[i,0:nb_vert_lev] = alt1[1:-1]
