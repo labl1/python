@@ -245,7 +245,7 @@ def get_profile_mnh(infile, indir, varnamelist, inres, loc_lat, loc_lon,
     if isinstance(varnamelist,str):
         varnamelist=[varnamelist]
 
-
+    print("reading "+indir + infile)
     ncfile1 = Dataset(indir + infile, 'r')
     try:
         lat = ncfile1.variables['LAT'][:, :]
