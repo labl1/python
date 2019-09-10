@@ -653,19 +653,16 @@ def netcdf2geo_map(infile,indir,varname, outdir, outftype = 'ps',
 
 
 def var2map(var1,lon1,lat1,  day, fig_title='',maplimits=[-18.,38.,-36.,10.],
-            out_path_fig='/home/labl/Bureau/', out_name='test', out_type='png'):
+            out_path_fig='/home/labl/Bureau/', out_name='test', out_type='png', vvmin=0.,vvmax=10.):
     # maplimits = [lonmin, lonmax, latmin, latmax]
     dlonlabel=10. # label latitude every 10 degrees
     #minlon=-18.65
     #maxlon=57.23
 
     proj = ccrs.PlateCarree()
-    ax = plt.axes(projection=proj)
 
-
-    # plot  -- try cartopy
     fig = plt.figure()
-    ax = plt.axes(projection=ccrs.PlateCarree())
+    ax = plt.axes(projection=proj)
     gl = ax.gridlines(crs=ccrs.PlateCarree(), draw_labels=True,
                   linewidth=0.6, color='gray', alpha=0.5, linestyle='--')
     ax.add_feature(cft.BORDERS, linestyle='-', alpha=.5)
@@ -682,7 +679,7 @@ def var2map(var1,lon1,lat1,  day, fig_title='',maplimits=[-18.,38.,-36.,10.],
 
     cp = plt.contourf(lon1, lat1, var1,
                       transform=ccrs.PlateCarree(),
-                      cmap=get_cmap('gnuplot') ,vmin=10., vmax=3210, levels= np.linspace(10, 3210, 21), alpha=0.92)
+                      cmap=get_cmap('gnuplot') ,vmin=vvmin, vmax=vvmax, levels= np.linspace(vvmin, vvmax, 21), alpha=0.92)
     plt.colorbar(cp)
 
     # for some reason color keyword doesn't work
@@ -701,18 +698,13 @@ def var2map(var1,lon1,lat1,  day, fig_title='',maplimits=[-18.,38.,-36.,10.],
     plt.close(fig)
 
 
-### a TESTER / FINIR (21 Aout 2019)
-def tracer_vert_int(tracer_file,tracer_name,day,alt_file):
+def tracer_vert_int(tracer_file,tracer_name,day,alt_file,path_out='.',outname='file_out'):
     svt_nc=Dataset(tracer_file,'r')
     svt=svt_nc.variables[tracer_name][0, 1:-1, 1:-1, 1:-1]
     #lon = svt_nc.variables['LON'][0, 1:-1, 1:-1, 1:-1] # LON
     #lat = svt_nc.variables['LAT'][0, 1:-1, 1:-1, 1:-1] # LAT
     lon=svt_nc.variables['longitude'][1:-1, 1:-1] # LON
     lat = svt_nc.variables['latitude'][1:-1, 1:-1] # LON
-    #try:
-    #    rho=svt_nc.variables['RHOREFZ'][0, 1:-1, 1:-1, 1:-1]
-    #except:
-        #temp = svt_nc.variables['TEMP'][0, 1:-1, 1:-1, 1:-1] + 273.15
     tht = svt_nc.variables['THT'][0, 1:-1, 1:-1, 1:-1]
     P   = svt_nc.variables['PABST'][0, 1:-1, 1:-1, 1:-1]  # ou PRESS * 100.
     Ra  = 287.058
@@ -722,13 +714,19 @@ def tracer_vert_int(tracer_file,tracer_name,day,alt_file):
     svt_i = rho * dalt * svt
 
     svt_int = np.sum(svt_i,axis=0)
-    threshold = 10.
+    threshold = 1.
     svt_int[np.where(svt_int < threshold)] = np.NaN
     print(np.shape(svt_int))
 
     # plot tracer
+    if tracer_name !='SVT004':
+        vmin=1
+        vmax=3201
+    else:
+        vmin=0.002
+        vmax=7.002
     var2map(svt_int, lon, lat, day, fig_title='', maplimits=[-18., 38., -36., 10.],
-            out_path_fig='/home/labl/Bureau/', out_name='test', out_type='png')
+            out_path_fig=path_out, out_name=outname, out_type='png', vvmin=vmin, vvmax=vmax)
 
     '''plot_2D_colormap(svt_int, alt, tracer_all,
                 out_name='passive_tracer_MNH'+exp+'vol6', cnorm=norm, out_path_fig='/home/labl/Bureau/', out_type='png',
