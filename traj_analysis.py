@@ -12,10 +12,24 @@ from netCDF4 import Dataset
 from math import pi
 import warnings
 from various_utils import get_profile_mnh, plot_2D_colormap
+import argparse
+import glob
 
-dir_in = '/home/labl/Bureau/'
-filelist = ['XA540.1.SEP13.001cct.trajZ.nc','XA540.1.SEP13.002cct.trajZ.nc' ]
-outfname = dir_in + 'quick_test.nc'
+# - # - # - #
+parser = argparse.ArgumentParser()
+parser.add_argument("filename", type=str, help="input filenames (full path), with wildcard")
+parser.add_argument("-dir", type=str, help="input / output directory")
+parser.add_argument("-exp", type=str, help="experiment name")
+args = parser.parse_args()
+
+exp = args.expname
+dir_in=args.dir
+filelist=glob.glob(args.filename)
+# ---
+
+#dir_in = '/home/labl/Bureau/'
+#filelist = ['XA540.1.SEP13.001cct.trajZ.nc','XA540.1.SEP13.002cct.trajZ.nc' ]
+outfname = dir_in + exp + 'trajZ.nc'
 
 ni = 512
 nj = 450
@@ -47,8 +61,8 @@ dz_max_3h_max = np.zeros([nlev, nj, ni])
 dz_min_3h_min = np.zeros([nlev, nj, ni])
 for file_in in filelist:
 
-    nctraj = Dataset(dir_in+file_in,'r')
-    print(dir_in+file_in)
+    nctraj = Dataset(file_in,'r')
+    print(file_in)
     time  = nctraj.variables['time'][:]
     trajZ = nctraj.variables['trajZ'][:,1:-1,1:-1,1:-1]
     trajZ[np.where(trajZ < -998.)] = np.nan # traj file does not have proper NaNs but large negative values instead
