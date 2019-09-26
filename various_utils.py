@@ -413,8 +413,8 @@ def plot_profile_mnh(infile, indir, allnames, inres, loc_lat, loc_lon, outdir, o
 def netcdf2geo_map(infile,indir,varname, outdir, outftype = 'ps',
                    colmap='rainbow',colorlev = 10, cmin = [], cmax=[],
                    cticks=[], proj='merc', nan_val=999.,
-                   dlatlabel = 4., dlonlabel = 4. , lev = 21, alt_max = 999.e3, lsum = False, islog=False, coordfile = [],
-                   ladd_arrow_wind=False, windfile=[], LSwind=False, cmapextend = 'both', extravar_contour=[], cmap_extra='Greys'):
+                   dlatlabel = 4., dlonlabel = 4. , lev = 21, llev_cleaned = False , alt_max = 999.e3, lsum = False, islog=False, coordfile = [],
+                   ladd_arrow_wind=False, windfile=[], LSwind=False, cmapextend = 'both', extravar_contour=[], cmap_extra='Greys', colorbar_units=[] ):
     ''' plot geographical maps of a given quantity (2D or 3D in which case a level should be specified
         ifile:    name of the input netcdf file
         idir:     input directory full path
@@ -427,13 +427,14 @@ def netcdf2geo_map(infile,indir,varname, outdir, outftype = 'ps',
         cmax    : max value for colormap
         islog:    if True a logarithmic colorscale will be used
         lev  :    model level at which the map will be ploted (for 3D variable)
+        llev_clean :   set to true if field is to be plotted at a given level + with the halo removed (only meaningfull part of the domain is kept)
         cticks:   where tick will be put in the colorbar
         dlatlabel: labels on the latitude axis will be put every dlatlabel degrees
         coordfile : full path of the file containing the coordinates LAT and LON, if this is not the input file itself
                   : leave empty if using the input file
         lsum      : if true, variable will be sum along the vertical from the ground to alt_max (m) (or to the highest model level)
         lswind    : to use the large-scale wind (coming from the coupling files) rather than the actueal model wind
-        cmapextend: extend the colorbar both direction beyond the colorbar limits (NB : no available with log colorscale)
+        cmapextend: extend the colorbar both direction beyond the colorbar limits (NB : no available with log colorscale) "neither", "both", "min", "max"
          '''
 # TODO: quite slow -> Why ?? =>> make it faster
     lcollev = False
@@ -447,15 +448,22 @@ def netcdf2geo_map(infile,indir,varname, outdir, outftype = 'ps',
     ncfile1 = Dataset(indir+infile,'r')
     if coordfile != []:
         coorddata = Dataset(coordfile)
-        lat=coorddata.variables['LAT'][1:-1,1:-1]
-        lon=coorddata.variables['LON'][1:-1,1:-1]
-    else:
+        if not llev_cleaned:
+            lat=coorddata.variables['LAT'][1:-1,1:-1]
+            lon=coorddata.variables['LON'][1:-1,1:-1]
+        else:
+            lat=coorddata.variables['latitude'][:,:]
+            lon=coorddata.variables['longitude'][:,:]
+    elif not llev_cleaned:
         try:
             lat=ncfile1.variables['LAT'][1:-1,1:-1]
             lon=ncfile1.variables['LON'][1:-1,1:-1]
         except:
             lat=ncfile1.variables['latitude'][1:-1,1:-1]
             lon=ncfile1.variables['longitude'][1:-1,1:-1]
+    else:
+        lat=ncfile1.variables['latitude'][:,:]
+        lon=ncfile1.variables['longitude'][:,:]
 
     latmin=np.nanmin(lat)
     latmax=np.nanmax(lat)
@@ -519,7 +527,13 @@ def netcdf2geo_map(infile,indir,varname, outdir, outftype = 'ps',
                 var= ncfile1.variables[varname][0, lev+1, 1:-1, 1:-1]
 
     elif vardim == 3:
-        var=ncfile1.variables[varname][0, 1:-1, 1:-1]
+        if not llev_cleaned:
+            var=ncfile1.variables[varname][0, 1:-1, 1:-1]
+
+        else:
+            var=ncfile1.variables[varname][lev, :, :]
+            alt = ncfile1.variables['level'][:]
+
     elif vardim == 2:
         var=ncfile1.variables[varname][1:-1, 1:-1]
     else:
@@ -595,9 +609,13 @@ def netcdf2geo_map(infile,indir,varname, outdir, outftype = 'ps',
     x,y = m(lon,lat)
     if not islog:
         if lcollev:
+            print(np.shape(x))
+            print(np.shape(y))
+            print(np.shape(var))
             cs = m.contourf(x,y,var,
                 levels = colorlev,
                 cmap=get_cmap(colmap),extend=cmapextend)
+
         else:
             cs = m.contourf(x,y,var,
             cmap=get_cmap(colmap))
@@ -620,7 +638,7 @@ def netcdf2geo_map(infile,indir,varname, outdir, outftype = 'ps',
     else:
         log_tag = '_log'
 
-    if vardim <= 3:
+    if vardim <= 3 and not llev_cleaned:
         plt.title(varname+' '+infile[:-3])
         nom_fig=varname+'_'+infile[:-3] + log_tag
     elif not lsum:
@@ -634,9 +652,10 @@ def netcdf2geo_map(infile,indir,varname, outdir, outftype = 'ps',
             plt.title(varname + '(summed up to ~'+str(int(round(alt_max)))+'m height)' + infile[:-3])
             nom_fig=varname+'_'+infile[:-3]+'_vertsum'+str(int(round(alt_max))) +log_tag
 
-
-    cb.set_label(varunits, labelpad=-40, y=1.05, rotation=0)
-
+    if colorbar_units==[]:
+        cb.set_label(varunits, labelpad=-40, y=1.05, rotation=0)
+    else:
+        cb.set_label(colorbar_units, labelpad=-40, y=1.05, rotation=0)
 
     if ladd_arrow_wind:
         m.quiver(x[0::10,0::10],y[0::10,0::10], UU[0::10,0::10], VV[0::10,0::10])
@@ -655,7 +674,8 @@ def netcdf2geo_map(infile,indir,varname, outdir, outftype = 'ps',
 def var2map(var1,lon1,lat1,  day, fig_title='',maplimits=[-18.,38.,-36.,10.],
             out_path_fig='/home/labl/Bureau/', out_name='test', out_type='png', vvmin=0.,vvmax=10.):
     # maplimits = [lonmin, lonmax, latmin, latmax]
-    dlonlabel=10. # label latitude every 10 degrees
+    # day : string
+    #dlonlabel=10. # label latitude every 10 degrees
     #minlon=-18.65
     #maxlon=57.23
 
