@@ -192,7 +192,7 @@ frac_dzup.units = '%'
 
 
 frac_dzup_cld = out_data.createVariable('frac_dzup3km_cld', np.float32, ('level', 'nj', 'ni'))
-frac_dzup_cld.longname = 'Fraction of traj with dz>3km in 3h '
+frac_dzup_cld.longname = 'Fraction of traj with in-cloud dz>3km in 3h '
 frac_dzup_cld.units = '%'
 
 frac_dzdown = out_data.createVariable('frac_dzdown3km', np.float32, ('level', 'nj', 'ni'))
