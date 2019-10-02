@@ -3,8 +3,11 @@
 # => identify how often an air parcel has raised of 3km or more over 3hours
 # => create a netcdf file with all the results for plotting (maps or cross-sections)
 
+# extra : add condition on the water content : the trajectory has to have been transported in a cloudy area
 
 # read the input files
+
+#NB for a consisten use of all the trajectory, it's essential to get the sme last X points for all of them
 
 import numpy as np
 import matplotlib as mpl
@@ -35,6 +38,8 @@ ni = 512
 nj = 450
 nlev = 65
 
+nb_step_traj=35
+
 dzth = 3. # threshold for 3-hour change in height (km)
 #traj_all = np.zeros(len(file_in_liste),)
 
@@ -45,11 +50,13 @@ dzth = 3. # threshold for 3-hour change in height (km)
 
 nb_dZ_max    = np.zeros([nlev, nj, ni])
 nb_dzp       = np.zeros([nlev, nj, ni])
+nb_dzp_R     = np.zeros([nlev, nj, ni])
 nb_dzm       = np.zeros([nlev, nj, ni])
 nb_dz_trj    = np.zeros([nlev, nj, ni])
 dz_trj_sum   = np.zeros([nlev, nj, ni])
 dz_max_3h_th = np.zeros([nlev, nj, ni])
 dz_min_3h_th = np.zeros([nlev, nj, ni])
+dz_max_3h_th_cld= np.zeros([nlev, nj, ni])
 dZ_max_sum   = np.zeros([nlev, nj, ni])
 dZ_max_max   = np.zeros([nlev, nj, ni])
 
@@ -63,13 +70,22 @@ for file_in in filelist:
 
     nctraj = Dataset(file_in,'r')
     print(file_in)
-    time  = nctraj.variables['time'][:]
-    trajZ = nctraj.variables['trajZ'][:,1:-1,1:-1,1:-1]
+    time  = nctraj.variables['time'][nb_step_traj:]
+    trajZ = nctraj.variables['trajZ'][nb_step_traj:,1:-1,1:-1,1:-1]
+    trajRC =nctraj.variables['trajRC'][nb_step_traj:,1:-1,1:-1,1:-1]
+    trajRI =nctraj.variables['trajRI'][nb_step_traj:,1:-1,1:-1,1:-1]
+    trajRS =nctraj.variables['trajRS'][nb_step_traj:,1:-1,1:-1,1:-1]
+
     trajZ[np.where(trajZ < -998.)] = np.nan # traj file does not have proper NaNs but large negative values instead
     trajZ[np.where(trajZ > 998.)] = np.nan # ùodel top at 26 km so not possible to exceed it
+    trajRC[np.where(trajRC < 0.) ] = np.nan
+    trajRC[np.where(trajRC > 998.) ] = np.nan
+    trajRI[np.where(trajRI < 0.) ] = np.nan
+    trajRI[np.where(trajRI > 998.) ] = np.nan
+    trajRS[(trajRS > 998.) | (trajRS < 0.)] = np.nan
     #altfile = '/home/labl/Bureau/TEST0_ALT_dia_file.nc'
     #alt = Dataset(altfile,'r').variables('ALT')[1:-1, 1:-1, 1:-1]
-
+    tot_hydro = trajRC + trajRI + trajRS
     min_trajZ = np.nanmin(trajZ,axis=0)
     max_trajZ = np.nanmax(trajZ,axis=0)
     dZ_max = max_trajZ - min_trajZ
@@ -97,13 +113,20 @@ for file_in in filelist:
     dz_max_3h_sum = np.nansum(np.stack((dz_max_3h_sum,dz_max_3h)),axis=0)
     dz_max_3h_max = np.nansum(np.stack((dz_max_3h_max,dz_max_3h)),axis=0)
     nb_dzp [np.isfinite(dz_max_3h)]  +=1
+    nb_dzp_R [ (np.isfinite(dz_max_3h)) & (np.isfinite(tot_hydro))  ] +=1
+
 
     dz_min_3h_sum = np.nansum(np.stack((dz_min_3h_sum,dz_min_3h)),axis=0)
     dz_min_3h_min = np.nanmin(np.stack((dz_min_3h_min,dz_min_3h)),axis=0)
     nb_dzm [np.isfinite(dz_min_3h)] +=1
 
+
     dz_max_3h_th[np.where(dz_max_3h > dzth)] += 1
     dz_min_3h_th[np.where(dz_min_3h < -dzth)] += 1
+
+## double condition does not work for np.where --> find a fancier way of doing it
+    dz_max_3h_th_cld[np.where( (dz_max_3h > dzth)
+                             & (tot_hydro > 1.e-6 ) )] += 1
 
     dz_max_3h_th2[np.where(dz_max_3h > dzth*2)] += 1
     dz_min_3h_th2[np.where(dz_min_3h < -dzth*2)] += 1
@@ -117,6 +140,8 @@ dz_trj_avg    = dz_trj_sum    / nb_dz_trj
 # fraction of dz above rthreshold
 dz_max_3h_th = dz_max_3h_th / nb_dzp *100.
 dz_min_3h_th = dz_min_3h_th / nb_dzm *100.
+
+dz_max_3h_th_cld  = dz_max_3h_th_cld / nb_dzp_R * 100.
 
 dz_max_3h_th2 = dz_max_3h_th2 / nb_dzp *100.
 dz_min_3h_th2 = dz_min_3h_th2 / nb_dzm *100.
@@ -165,6 +190,11 @@ frac_dzup = out_data.createVariable('frac_dzup3km', np.float32, ('level', 'nj', 
 frac_dzup.longname = 'Fraction of trajectories with dz > 3km in 3h'
 frac_dzup.units = '%'
 
+
+frac_dzup_cld = out_data.createVariable('frac_dzup3km_cld', np.float32, ('level', 'nj', 'ni'))
+frac_dzup_cld.longname = 'Fraction of traj with dz>3km in 3h '
+frac_dzup_cld.units = '%'
+
 frac_dzdown = out_data.createVariable('frac_dzdown3km', np.float32, ('level', 'nj', 'ni'))
 frac_dzdown.longname = 'Fraction of trajectories with dz < -3km in 3h'
 frac_dzdown.units = '%'
@@ -196,6 +226,7 @@ dz_max_3h_max1[:] = dz_max_3h_max
 dz_min_3h_min1[:] = dz_min_3h_min
 
 frac_dzup[:] = dz_max_3h_th
+frac_dzup_cld[:]=dz_max_3h_th_cld
 frac_dzdown[:] = dz_min_3h_th
 frac_dzup2[:] = dz_max_3h_th2
 frac_dzdown2[:] = dz_min_3h_th2
