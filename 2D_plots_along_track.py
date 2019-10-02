@@ -82,21 +82,44 @@ def plot_2D_along_LNG(x, y, array2D, ice, cloud,
     fig1.savefig(out_path_fig + '/' + out_name + '.' + out_type)
     plt.close(fig1)
 
+######## -------- MAIN --------- ########
 
-
+nbtracers = 4
 lyinvert = False
-ymin=[]
-ymax=[]
+ymin=0.
+ymax=10.
 norm = mpl.colors.Normalize(vmin=0.,vmax=0.15)
 
-exp = 'XA54b'
-filename = '/home/labl/Bureau/20170905_Vol6_MNH_'+exp+'_pTracer.nc'
+#exp = 'XA54b'
+#filename = '/home/labl/Bureau/20170905_Vol6_MNH_'+exp+'_pTracer.nc'
+parser = argparse.ArgumentParser()
+parser.add_argument("filename", type=str, help="input filename (full path)")
+parser.add_argument("-exp", type=str, help="meso-nh experiment name")
+parser.add_argument("-vol", type=str, help="flight number")
+parser.add_argument("-outdir", type=str, help="flight number")
+
+args = parser.parse_args()
+filename=args.filename
+exp = args.exp
+flightnb = args.vol
+out_path = args.outdir
+
 ncfile = Dataset(filename)  #'/home/labl/Bureau/20170905_Vol6_MNH_'+exp+'_pTracer.nc')
 nb_vert_lev = 65
 time_mnh_all = ncfile.variables['time'][:]
 alt = ncfile.variables['altitude'][:,:] / 1000.
-tracer_all = ncfile.variables['SVT001'][:,:]
-tracer_all[np.where(tracer_all <= 0)] = np.NaN
+
+'''
+tracer_all1 = ncfile.variables['SVT001'][:,:]
+tracer_all1[np.where(tracer_all <= 0)] = np.NaN
+tracer_all2 = ncfile.variables['SVT002'][:,:]
+tracer_all2[np.where(tracer_all <= 0)] = np.NaN
+tracer_all3 = ncfile.variables['SVT003'][:,:]
+tracer_all3[np.where(tracer_all <= 0)] = np.NaN
+tracer_all4 = ncfile.variables['SVT004'][:,:]
+tracer_all4[np.where(tracer_all <= 0)] = np.NaN
+'''
+
 rct = ncfile.variables['RCT'][:,:]
 rit = ncfile.variables['RIT'][:,:]
 
@@ -112,11 +135,23 @@ DSTMtot = DSTM33T + DSTM32T + DSTM31T
 time_mnh_all_2D = np.transpose(np.array([time_mnh_all for x in range(nb_vert_lev)]))
 alt_LNG_2D = np.array([alt_LNG for y in range(len(time_mnh_all))])
 time_LNG_all_2D = np.transpose(np.array([time_mnh_all for xx in range(len(alt_LNG))]))
+norm = mpl.colors.Normalize(vmin=0.,vmax=0.15)
 
-plot_2D_along_LNG(time_mnh_all_2D, alt, tracer_all, rit,rct, dust=DSTMtot, lpltLNG=True, LNGarray2D=ABC_1064nm, alt_LNG=alt_LNG_2D, tt_LNG = time_LNG_all_2D,
-                out_name='passive_tracer_MNH'+exp+'vol6', nnorm=norm, out_path_fig='/home/labl/Bureau/', out_type='png',
+for it in range(1,nbtracers+1):
+    tracer_name='SVT'+str(it).zfill(3)
+    tracer_all = ncfile.variables[tracer_name][:,:]
+    tracer_all[np.where(tracer_all <= 0)] = np.NaN
+    if it!=4:
+        norm = mpl.colors.Normalize(vmin=0.,vmax=0.15)
+    else:
+        norm = mpl.colors.Normalize(vmin=0.,vmax=0.0001)
+
+    plot_2D_along_LNG(time_mnh_all_2D, alt, tracer_all, rit,rct, 
+                dust=DSTMtot, lpltLNG=True, LNGarray2D=ABC_1064nm, alt_LNG=alt_LNG_2D, tt_LNG = time_LNG_all_2D,
+                out_name='passive_tracer_'+tracer_name+'_'+exp+'_vol'+flightnb, nnorm=norm, out_path_fig=out_path, out_type='png',
                 lyinvert=False, ccmap='gist_heat',
-                title=exp+' passive tracer + RIT (white), RCT (blue), and Dust (yellow) ', xlabel='Time (days in year 2017)', ylabel='Altitude (km)',ymax = 10., ymin=0.)
+                title=exp+ tracer_name + ' passive tracer + RIT (white), RCT (blue), and Dust (yellow) ',
+                xlabel='Time (days in year 2017)', ylabel='Altitude (km)',ymax = ymax, ymin = ymin)
 '''
 norm = mpl.colors.Normalize(vmin=0.,vmax=3)
 

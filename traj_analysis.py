@@ -1,3 +1,4 @@
+#/home/labl/miniconda3/envs/small_env/bin/python3
 # program to analyse the Z backtrajectories result
 # => compute maps of the average vertical max displacment over the 105 back traj hours
 # => identify how often an air parcel has raised of 3km or more over 3hours
@@ -21,12 +22,12 @@ import glob
 # - # - # - #
 parser = argparse.ArgumentParser()
 parser.add_argument("filename", type=str, help="input filenames (full path), with wildcard")
-parser.add_argument("-dir", type=str, help="input / output directory")
-parser.add_argument("-exp", type=str, help="experiment name")
+parser.add_argument("-dirname", type=str, help="input / output directory")
+parser.add_argument("-expname", type=str, help="experiment name")
 args = parser.parse_args()
 
 exp = args.expname
-dir_in=args.dir
+dir_in=args.dirname
 filelist=glob.glob(args.filename)
 # ---
 
@@ -111,7 +112,7 @@ for file_in in filelist:
     nb_dZ_max[np.isfinite(dZ_max)] += 1
 
     dz_max_3h_sum = np.nansum(np.stack((dz_max_3h_sum,dz_max_3h)),axis=0)
-    dz_max_3h_max = np.nansum(np.stack((dz_max_3h_max,dz_max_3h)),axis=0)
+    dz_max_3h_max = np.nanmax(np.stack((dz_max_3h_max,dz_max_3h)),axis=0)
     nb_dzp [np.isfinite(dz_max_3h)]  +=1
     nb_dzp_R [ (np.isfinite(dz_max_3h)) & (np.isfinite(tot_hydro))  ] +=1
 
